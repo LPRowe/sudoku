@@ -14,6 +14,7 @@ import matplotlib.image as mpimg
 from itertools import product
 import time
 
+import humanoid_solver as hs
 
 pygame.init()
 
@@ -177,6 +178,9 @@ class game_board(object):
         #Load images for all tiles played in given locations {(x,y):value,...}
         self.arr=arr
         
+        #solutin will be generated when the array is populated
+        self.solution=None
+        
         #Load pencil marks (text) for all uninserted values {(x,y):[values],...}
         self.pencil_marks=pencil_marks
         
@@ -191,9 +195,20 @@ class game_board(object):
         
         #Box (highlight) the input square on a grid if it is selected by the user
         self.is_boxed=False
+        print('self.is_boxed=False')
         
         #The square is given by grid coordinates i.e. (0,0) or (4,8)
         self.boxed=None
+        self.box_color=(0,0,200)
+        
+        #box separating line properties
+        self.thick_line_thickness=5
+        self.thick_line_color=(43,29,14)
+        #deep brown: (43,29,14)
+        #light brown: (86,58,28)
+        
+        #grid line properties
+        self.thin_line_color=(255,255,255)
         
         
         # =============================================================================
@@ -233,15 +248,29 @@ class game_board(object):
         win.blit(bg_board,(self.x,self.y))
         
         #Add lines for sudoku blocks
+        line_start_buffer=1 #[pixels] shift the beginning of the line to account for rounding errors
+        #line_end_buffer=0 #[pixels] shift the end of the line to account for rounding errors
         for i in range(1,9):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness+i*line_spacing,self.y+border_thickness),(self.x+border_thickness+i*line_spacing,self.y+border_thickness+grid_size))
+            #vertical lines
+            pygame.draw.line(win,self.thin_line_color,(int(self.x+border_thickness+i*line_spacing),int(line_start_buffer+self.y+border_thickness)),(int(self.x+border_thickness+i*line_spacing),int(self.y+border_thickness+grid_size)))
         for j in range(1,9):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness,self.y+border_thickness+j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+j*line_spacing))
+            #horizontal lines
+            pygame.draw.line(win,self.thin_line_color,(int(line_start_buffer+self.x+border_thickness),int(self.y+border_thickness+j*line_spacing)),(int(self.x+border_thickness+grid_size),int(self.y+border_thickness+j*line_spacing)))
                 
         #If sudoku is not populated, populate the sudoku
         if not self.board_set:
             self.arr=populate_board(self.difficulty)
             self.board_set=True
+            
+            if self.difficulty=='Easy':
+                #insert 9 of one value for testing purposes
+                self.arr[8,4]=3
+                self.arr[4,5]=3
+            
+            self.solution=solve_sudoku(self.arr).arr
+            
+            
+        
             
         #Add Tiles
         for (row,column) in product(range(9),range(9)):
@@ -257,16 +286,23 @@ class game_board(object):
         
         #Add thick lines for boxes
         for i in range(1,3):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness+grid_size),10)
+            pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness+grid_size),self.thick_line_thickness)
         for j in range(1,3):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),10)
+            pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),self.thick_line_thickness)
 
         #Highlight a box if the user is focusing on it to insert a value
-        if is_focused:
-            column,row=self.box
-            tile_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
-            tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
-            pygame.draw.rect(win,(0,0,200),(tile_x,tile_y,tile_size,tile_size),3)
+        if self.is_boxed:
+            if type(self.boxed)==tuple:
+                column,row=self.boxed[0],self.boxed[1]
+                tile_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
+                tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
+                pygame.draw.rect(win,self.box_color,(tile_x,tile_y,tile_size,tile_size),3)
+            elif type(self.boxed)==list:
+                for item in self.boxed:
+                    column,row=item[0],item[1]
+                    tile_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
+                    tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
+                    pygame.draw.rect(win,self.box_color,(tile_x,tile_y,tile_size,tile_size),3)
             
         #Add a line of tiles below the grid
         count=0
@@ -323,6 +359,19 @@ class game_board(object):
 # =============================================================================
 def populate_board(difficulty):
     return np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_'+difficulty.lower()+'.txt',delimiter=' '),'int')
+
+def solve_sudoku(arr):
+    arr=hs.sudoku(arr)
+    arr.square_by_square
+    if int(arr.percent())!=100:
+        #if the square by square method did not completely solve the suodku try solving pair by pari
+        arr.pair_by_pair()
+    
+    if int(arr.percent())==100:
+        return arr
+    else:
+        print('This sudoku is not solvable without resorting to brute force methods.')
+        return None
 
 
 # =============================================================================
@@ -483,27 +532,97 @@ def take_action(action):
     
     if action=='pen_icon':
         on_pen,on_pencil=True,False
-    
-    #If a square on the grid is clicked
+        
     if action[0]=='(':
         #Note the location on the grid that was clicked by making it
         #the square of focus
         focus=eval(action)
         
         #if a square is already boxed and is clicked again, defocus the square
-        if focus==board.boxed:
+        if board.is_boxed and focus==board.boxed:
             #remove focus from that box
-            board.is_boxed=False
-            board.boxed=focus
             is_focused=False
-        else:
+            board.is_boxed=False
+            board.boxed=tuple((focus[0],focus[1]))
+        #highlight the new square if the square is not solved for yet
+        elif focus!=board.boxed and board.arr[focus[::-1]]==0:
             board.is_boxed=True
-            board.box=focus
+            board.boxed=tuple(focus)
             is_focused=True
-        
-        board.draw()
+            
+            #make box blue
+            board.box_color=(0,0,200)
+        #highlight all squares that have been solved for with that value
+        elif focus!=board.boxed and board.arr[focus[::-1]]!=0:
+            solved_value=board.arr[focus[::-1]]
+            board.is_boxed=True
+            board.boxed=[]
 
-        pass
+            i=0
+            for row in board.arr:
+                j=0
+                for column in row:
+                    if board.arr[i,j]==solved_value:
+                        board.boxed.append((j,i))
+                    j+=1
+                i+=1
+            
+            #make boxes green
+            board.box_color=(0,200,0)
+    
+    #If a number is clicked in the input number row located below the board
+    input_numbers=[str(i) for i in range(1,10)]
+    if action in input_numbers:
+        if type(board.boxed)!=tuple:
+            #take no action if a valid input square is not already selected
+            return None
+        elif type(board.boxed)==tuple and len(board.arr[board.arr==int(action)])==9:
+            #if there are already 9 of this number inserted
+            #highlight the inserted values on the board
+            board.is_boxed=True
+            board.boxed=[]
+
+            i=0
+            for row in board.arr:
+                j=0
+                for column in row:
+                    if board.arr[i,j]==int(action):
+                        board.boxed.append((j,i))
+                    j+=1
+                i+=1
+            
+            #make boxes green
+            board.box_color=(0,200,0)
+            
+        elif type(board.boxed)==tuple and board.solution[board.boxed]==int(action):
+            #If a box is selected and the input value matches the solution
+            #add the input value into the array
+            board.arr[board.boxed]=int(action)
+        elif type(board.boxed)==tuple and board.solution[board.boxed]!=int(action):
+            #an input was inserted, but it does not agree with the solution
+            violation=True
+            
+            #check if the input value violates any box, row or column rules
+            input_col,input_row=board.boxed[0],board.boxed[1]
+            test_arr=hs.sudoku(board.arr)
+            test_arr.insert(board.boxed[0],board.boxed[1],int(action))
+            if list(test_arr.cols()[input_col]).count(int(action))==1:
+                if list(test_arr.rows()[input_row]).count(int(action))==1:
+                    if list(test_arr.list_boxes()[test_arr.in_box(input_col,input_row)]).count(int(action))==1:
+                        violation=False
+            
+            if violation:
+                print('This is not a valid entry')
+                return None
+
+            #if the value is not in violation of box, row or column rules
+            #check to see if a solution exists to the array with the new input value
+            if solve_sudoku(test_arr)!=None:
+                board.arr[board.boxed[::-1]]=int(action)
+            else:
+                print('This entry leads to an unsolvable puzzle')
+                return None
+        
     
 
 # =============================================================================

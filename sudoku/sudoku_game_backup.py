@@ -191,9 +191,19 @@ class game_board(object):
         
         #Box (highlight) the input square on a grid if it is selected by the user
         self.is_boxed=False
+        print('self.is_boxed=False')
         
         #The square is given by grid coordinates i.e. (0,0) or (4,8)
         self.boxed=None
+        
+        #box separating line properties
+        self.thick_line_thickness=5
+        self.thick_line_color=(43,29,14)
+        #deep brown: (43,29,14)
+        #light brown: (86,58,28)
+        
+        #grid line properties
+        self.thin_line_color=(255,255,255)
         
         
         # =============================================================================
@@ -228,15 +238,19 @@ class game_board(object):
         
     def draw(self):
         global elapsed_time, clock
-        global square, square_of_focus
+        global is_focused
         
         win.blit(bg_board,(self.x,self.y))
         
         #Add lines for sudoku blocks
+        line_start_buffer=1 #[pixels] shift the beginning of the line to account for rounding errors
+        #line_end_buffer=0 #[pixels] shift the end of the line to account for rounding errors
         for i in range(1,9):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness+i*line_spacing,self.y+border_thickness),(self.x+border_thickness+i*line_spacing,self.y+border_thickness+grid_size))
+            #vertical lines
+            pygame.draw.line(win,self.thin_line_color,(int(self.x+border_thickness+i*line_spacing),int(line_start_buffer+self.y+border_thickness)),(int(self.x+border_thickness+i*line_spacing),int(self.y+border_thickness+grid_size)))
         for j in range(1,9):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness,self.y+border_thickness+j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+j*line_spacing))
+            #horizontal lines
+            pygame.draw.line(win,self.thin_line_color,(int(line_start_buffer+self.x+border_thickness),int(self.y+border_thickness+j*line_spacing)),(int(self.x+border_thickness+grid_size),int(self.y+border_thickness+j*line_spacing)))
                 
         #If sudoku is not populated, populate the sudoku
         if not self.board_set:
@@ -257,16 +271,16 @@ class game_board(object):
         
         #Add thick lines for boxes
         for i in range(1,3):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness+grid_size),10)
+            pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness+grid_size),self.thick_line_thickness)
         for j in range(1,3):
-            pygame.draw.line(win,(255,255,255),(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),10)
+            pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),self.thick_line_thickness)
 
         #Highlight a box if the user is focusing on it to insert a value
         if self.is_boxed:
-            column,row=self.box
+            column,row=self.boxed
             tile_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
             tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
-            pygame.draw.rect(win,(0,0,128),(tile_x,tile_y,tile_size,tile_size),width=2)
+            pygame.draw.rect(win,(0,0,200),(tile_x,tile_y,tile_size,tile_size),3)
             
         #Add a line of tiles below the grid
         count=0
@@ -429,7 +443,8 @@ def take_action(action):
     global elapsed_time, clock
     global on_pen, on_pencil
     global difficulty
-    global square_of_focus, square
+    global focus, is_focused
+    global board, screen
     
     # =========================================================================
     # MAIN MENU ACTIONS   
@@ -437,6 +452,8 @@ def take_action(action):
     if action in ['Easy','Medium','Hard','Expert']:
         #set game difficulty
         difficulty=action
+        
+        board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None,None)
         
         #Switch menu off and game on
         on_game,on_menu=on_menu,on_game
@@ -470,6 +487,8 @@ def take_action(action):
     # =========================================================================    
     
     if action=='back_icon':
+        screen=main_page()
+        
         #Switch game off and menu on
         on_game,on_menu=on_menu,on_game
         
@@ -478,20 +497,24 @@ def take_action(action):
     
     if action=='pen_icon':
         on_pen,on_pencil=True,False
-    
-    #If a square on the grid is clicked
+        
     if action[0]=='(':
         #Note the location on the grid that was clicked by making it
         #the square of focus
         focus=eval(action)
-        is_focused=True
         
         #if a square is already boxed and is clicked again, defocus the square
-        if focus==board.boxed and board.is_boxed:
+        if board.is_boxed and focus==board.boxed:
             #remove focus from that box
+            is_focused=False
             board.is_boxed=False
-
-        pass
+            board.boxed=tuple((focus[0],focus[1]))
+        #otherwise highlight the new square
+        else:
+            board.is_boxed=True
+            board.boxed=focus
+            is_focused=True
+        
     
 
 # =============================================================================
@@ -524,16 +547,16 @@ def redrawGameWindow():
         #add board     
         board.draw()
 
-
-    for num in numbers:
-        num.draw(win)
         
     pygame.display.update()
 
 # =============================================================================
 # MAIN LOOP
 # =============================================================================
-numbers=[] #populate numbers with the initially given values
+screen=main_page()
+
+#start off not focusing on any given square
+is_focused=False
 
 #Text for screen (bold and italiscized)
 font = pygame.font.SysFont('comicsans', 30,True)
@@ -549,18 +572,7 @@ while run:
         if event.type==pygame.QUIT:
             run=False
 
-    if on_menu:
-        try:
-            sudoku_arr=board.arr
-        except:
-            sudoku_arr=None
-        difficulty='easy'
-
-    screen=main_page()
-    board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None,None)
-
-    
-    #Move character
+    #Accept key and mouse inputs
     keys=pygame.key.get_pressed()
     mouse=pygame.mouse
     
@@ -573,9 +585,6 @@ while run:
         if item_clicked:
             print(item_clicked)
             take_action(item_clicked)
-        
-        
-    sudoku_arr=board.arr
     
     redrawGameWindow()
 
