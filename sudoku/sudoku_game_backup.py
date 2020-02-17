@@ -228,7 +228,7 @@ class game_board(object):
         
     def draw(self):
         global elapsed_time, clock
-        global is_focused
+        global square, square_of_focus
         
         win.blit(bg_board,(self.x,self.y))
         
@@ -262,11 +262,11 @@ class game_board(object):
             pygame.draw.line(win,(255,255,255),(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),10)
 
         #Highlight a box if the user is focusing on it to insert a value
-        if is_focused:
+        if self.is_boxed:
             column,row=self.box
             tile_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
             tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
-            pygame.draw.rect(win,(0,0,200),(tile_x,tile_y,tile_size,tile_size),3)
+            pygame.draw.rect(win,(0,0,128),(tile_x,tile_y,tile_size,tile_size),width=2)
             
         #Add a line of tiles below the grid
         count=0
@@ -429,8 +429,7 @@ def take_action(action):
     global elapsed_time, clock
     global on_pen, on_pencil
     global difficulty
-    global focus, is_focused
-    global board, screen
+    global square_of_focus, square
     
     # =========================================================================
     # MAIN MENU ACTIONS   
@@ -438,8 +437,6 @@ def take_action(action):
     if action in ['Easy','Medium','Hard','Expert']:
         #set game difficulty
         difficulty=action
-        
-        board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None,None)
         
         #Switch menu off and game on
         on_game,on_menu=on_menu,on_game
@@ -473,8 +470,6 @@ def take_action(action):
     # =========================================================================    
     
     if action=='back_icon':
-        screen=main_page()
-        
         #Switch game off and menu on
         on_game,on_menu=on_menu,on_game
         
@@ -489,19 +484,12 @@ def take_action(action):
         #Note the location on the grid that was clicked by making it
         #the square of focus
         focus=eval(action)
+        is_focused=True
         
         #if a square is already boxed and is clicked again, defocus the square
-        if focus==board.boxed:
+        if focus==board.boxed and board.is_boxed:
             #remove focus from that box
             board.is_boxed=False
-            board.boxed=focus
-            is_focused=False
-        else:
-            board.is_boxed=True
-            board.box=focus
-            is_focused=True
-        
-        board.draw()
 
         pass
     
@@ -536,16 +524,16 @@ def redrawGameWindow():
         #add board     
         board.draw()
 
+
+    for num in numbers:
+        num.draw(win)
         
     pygame.display.update()
 
 # =============================================================================
 # MAIN LOOP
 # =============================================================================
-screen=main_page()
-
-#start off not focusing on any given square
-is_focused=False
+numbers=[] #populate numbers with the initially given values
 
 #Text for screen (bold and italiscized)
 font = pygame.font.SysFont('comicsans', 30,True)
@@ -561,7 +549,18 @@ while run:
         if event.type==pygame.QUIT:
             run=False
 
-    #Accept key and mouse inputs
+    if on_menu:
+        try:
+            sudoku_arr=board.arr
+        except:
+            sudoku_arr=None
+        difficulty='easy'
+
+    screen=main_page()
+    board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None,None)
+
+    
+    #Move character
     keys=pygame.key.get_pressed()
     mouse=pygame.mouse
     
@@ -574,6 +573,9 @@ while run:
         if item_clicked:
             print(item_clicked)
             take_action(item_clicked)
+        
+        
+    sudoku_arr=board.arr
     
     redrawGameWindow()
 

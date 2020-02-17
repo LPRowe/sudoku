@@ -322,7 +322,7 @@ class sudoku(object):
     
 if __name__=='__main__':
     #load array as allinteger values
-    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_medium.txt',delimiter=' '),'int')
+    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_expert.txt',delimiter=' '),'int')
     
     #create sudoku object using array
     s=sudoku(arr)
