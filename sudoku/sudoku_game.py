@@ -28,6 +28,7 @@ screen_submenu=pygame.image.load('./graphics/menu_box.jpg')
 
 #sound effects iconcs
 sound_effects_icon=pygame.image.load('./graphics/sound_effects_icon.png')
+sound_effects_off_icon=pygame.image.load('./graphics/sound_effects_off_icon.png')
 music_icon=pygame.image.load('./graphics/music_icon.png')
 
 #Logo
@@ -49,10 +50,10 @@ cycle_icon=pygame.image.load('./graphics/cycle.jpg')
 sound_effects_playing=True
 
 #click sound effect
-click=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
+play_tile_sound_effect=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
 
 #new game sound effect
-intro_sound_effect=pygame.mixer.Sound('./sound-effects/new-game/gong.wav')
+new_game_sound_effect=pygame.mixer.Sound('./sound-effects/new-game/gong.wav')
 
 #mistake sound effect
 mistake_sound_effect=pygame.mixer.Sound('./sound-effects/oops/little-girl-wrong-javapimp.ogg')
@@ -82,6 +83,7 @@ screen_submenu=pygame.transform.scale(screen_submenu,(int(0.6*screen_x),int(0.7*
 #sound-effects, music and cycle
 icon_scale=0.13
 sound_effects_icon=pygame.transform.scale(sound_effects_icon, (int(icon_scale*screen_x), int(icon_scale*screen_x)))
+sound_effects_off_icon=pygame.transform.scale(sound_effects_off_icon, (int(icon_scale*screen_x), int(icon_scale*screen_x)))
 music_icon=pygame.transform.scale(music_icon,(int(icon_scale*screen_x), int(icon_scale*screen_x)))
 cycle_icon=pygame.transform.scale(cycle_icon,(int(0.4*music_icon.get_size()[0]),int(0.4*music_icon.get_size()[0])))
 
@@ -162,7 +164,8 @@ class main_page(object):
         self.music_loc=(int(self.sub_menu_loc[0]*0.5-music_icon.get_size()[0]*0.5), int(self.sub_menu_loc[1]+screen_submenu.get_size()[1]*0.3))
         self.cycle_loc=(int(self.music_loc[0]+music_icon.get_size()[0]),int(self.music_loc[1]+music_icon.get_size()[1]-cycle_icon.get_size()[1]))
         self.sound_effect_loc=(int(self.sub_menu_loc[0]*0.5-sound_effects_icon.get_size()[0]*0.5), int(self.sub_menu_loc[1]+screen_submenu.get_size()[1]*0.6))
-        
+        self.sound_effect_off_loc=(int(self.sub_menu_loc[0]*0.5-sound_effects_off_icon.get_size()[0]*0.5), int(self.sub_menu_loc[1]+screen_submenu.get_size()[1]*0.6))
+
     def draw(self):
         #ADD TITLE
         win.blit(screen_title, self.title_loc)
@@ -179,8 +182,12 @@ class main_page(object):
             
         #ADD SOUND EFFECTS AND MUSIC ICONS
         win.blit(music_icon,self.music_loc)
-        win.blit(sound_effects_icon,self.sound_effect_loc)
         win.blit(cycle_icon,self.cycle_loc)
+        if sound_effects_playing:
+            win.blit(sound_effects_icon,self.sound_effect_loc)
+        else:
+            win.blit(sound_effects_off_icon,self.sound_effect_loc)
+
         
         
 # =============================================================================
@@ -266,6 +273,10 @@ class game_board(object):
         #sound effects
         self.sound_effects_y=self.pen_y
         self.sound_effects_x=int(0.9*bg_screen.get_size()[0]-sound_effects_icon.get_size()[0]*0.5)
+        
+        #sound effects off
+        self.sound_effects_off_y=self.sound_effects_y
+        self.sound_effects_off_x=self.sound_effects_x
         
         #back button
         self.back_y=int(0.5*tile_size)
@@ -391,8 +402,11 @@ class game_board(object):
         
         #ADD ICONS FOR TURNING MUSIC AND SOUND EFFECTS ON/OFF
         win.blit(music_icon,(self.music_x,self.music_y))
-        win.blit(sound_effects_icon,(self.sound_effects_x,self.sound_effects_y))
-        
+        if sound_effects_playing:
+            win.blit(sound_effects_icon,(self.sound_effects_x,self.sound_effects_y))
+        else:
+            win.blit(sound_effects_off_icon,(self.sound_effects_off_x,self.sound_effects_off_y))
+
         #ADD ICON FOR CYCLING THE MUSIC
         win.blit(cycle_icon,(self.cycle_x,self.cycle_y))
     
@@ -448,6 +462,8 @@ def solve_sudoku(arr):
         print('The resulting sudoku would not be solvable by human methods.\n')
         board.warning_message='The resulting sudoku would not be solvable by human methods.'
         board.warning_start=elapsed_time
+        if sound_effects_playing:
+            mistake_sound_effect.play()
         return None
 
 
@@ -575,6 +591,9 @@ def take_action(action):
     # MAIN MENU ACTIONS   
     # =========================================================================
     if action in ['Easy','Medium','Hard','Expert']:
+        if sound_effects_playing:
+            new_game_sound_effect.play()
+        
         #set game difficulty
         difficulty=action
         oops_count=0
@@ -638,6 +657,8 @@ def take_action(action):
                 board.arr[y,x]=val
                 board.pencil_marks[(x,y)]=[]
                 board.is_boxed=False
+                if sound_effects_playing:
+                    play_tile_sound_effect.play()
                 break
         return None
         
@@ -709,6 +730,8 @@ def take_action(action):
             board.arr[board.boxed[::-1]]=int(action)
             board.is_boxed=False
             board.pencil_marks[board.boxed]=[]
+            if sound_effects_playing:
+                play_tile_sound_effect.play()
         elif type(board.boxed)==tuple and board.solution[board.boxed[::-1]]!=int(action):
             #an input was inserted, but it does not agree with the solution
             violation=True
@@ -726,6 +749,8 @@ def take_action(action):
                 print('This is not a valid entry')  
                 board.warning_message='Not a valid entry.'
                 board.warning_start=elapsed_time
+                if sound_effects_playing:
+                    mistake_sound_effect.play()
                 return None
 
             #if the value is not in violation of box, row or column rules
@@ -739,6 +764,8 @@ def take_action(action):
                 board.warning_message='Entry makes sudoku unsolvable.'
                 board.warning_start=elapsed_time
                 oops_count+=1
+                if sound_effects_playing:
+                    mistake_sound_effect.play()
                 return None
         
         

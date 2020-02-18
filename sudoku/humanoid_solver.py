@@ -109,7 +109,7 @@ class sudoku(object):
                     intersecting_values=col_set.intersection(row_set.intersection(box_set))
                     if len(intersecting_values)==0:
                         print('No value satisfies position ({},{}), previous error exists.'.format(x,y))
-                        break
+                        return None
                     if len(intersecting_values)==1:
                         #insert the value into the sudoku at location (x,y)
                         true_value=intersecting_values.pop()
