@@ -7,19 +7,13 @@ Created on Sun Feb 16 00:15:57 2020
 
 import pygame
 import numpy as np
-import os
-import glob
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 from itertools import product
-import time
-
 import humanoid_solver as hs
 
 pygame.init()
 
 # =============================================================================
-# LOAD SOUND AND GRAPHICS
+# LOAD GRAPHICS
 # =============================================================================
 #board and tiles
 bg_board=pygame.image.load('./graphics/sudoku_board.png')
@@ -36,16 +30,6 @@ screen_submenu=pygame.image.load('./graphics/menu_box.jpg')
 sound_effects_icon=pygame.image.load('./graphics/sound_effects_icon.png')
 music_icon=pygame.image.load('./graphics/music_icon.png')
 
-#Sound effects
-sound_effects_playing=True
-oops_1=pygame.mixer.Sound('./sound-effects/ouch_1.wav')
-oops_2=pygame.mixer.Sound('./sound-effects/ouch_2.wav')
-pew=pygame.mixer.Sound('./sound-effects/laser_pew.wav')
-
-music_playing=True
-music=pygame.mixer.music.load('./sound-effects/music.mp3')
-pygame.mixer.music.play(-1)
-
 #Logo
 logo=pygame.image.load('./graphics/simple-logo.png')
 pygame.display.set_icon(logo)
@@ -55,53 +39,83 @@ pencil_icon=pygame.image.load('./graphics/pencil_1.png')
 pen_icon=pygame.image.load('./graphics/pen_3.jpg')
 back_icon=pygame.image.load('./graphics/back_icon.jpg')
 
+#cycle for changing music
+cycle_icon=pygame.image.load('./graphics/cycle.jpg')
+
+
 # =============================================================================
-# SET INITIAL CONDITIONS AND CONSTRAINTS AND SCALE SURFACES ACCORDING TO WINDOW SIZE
+# LOAD SOUND EFFECTS AND MUSIC
+# =============================================================================
+sound_effects_playing=True
+
+#click sound effect
+click=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
+
+#new game sound effect
+intro_sound_effect=pygame.mixer.Sound('./sound-effects/new-game/gong.wav')
+
+#mistake sound effect
+mistake_sound_effect=pygame.mixer.Sound('./sound-effects/oops/little-girl-wrong-javapimp.ogg')
+
+
+#Background Music
+music_playing=True
+music_cycle=0
+music_files=['./sound-effects/background/music.mp3','./sound-effects/background/chill-retro-background-magntron.mp3','./sound-effects/background/melancholic-background-goodbyte.mp3','./sound-effects/background/up-beat-electric-background-cebuana.mp3']
+music=pygame.mixer.music.load('./sound-effects/background/music.mp3')
+pygame.mixer.music.play(-1)
+
+# =============================================================================
+# SCALE SURFACES ACCORDING TO WINDOW SIZE
 # =============================================================================
 #Choose Screen Size
 screen_x,screen_y=450,728 #golden ratio for aesthetics
 
-#Scale background images
+#background images
 bg_screen=pygame.transform.scale(bg_screen,(screen_x,screen_y))
 bg_board=pygame.transform.scale(bg_board,(screen_x,screen_x))
 
-#scale main menu items
+#main menu items
 screen_title=pygame.transform.scale(screen_title,(int(0.8*screen_x),int(screen_title.get_size()[1]*(0.8*screen_x/screen_title.get_size()[0]))))
 screen_submenu=pygame.transform.scale(screen_submenu,(int(0.6*screen_x),int(0.7*screen_y)))
 
+#sound-effects, music and cycle
 icon_scale=0.13
 sound_effects_icon=pygame.transform.scale(sound_effects_icon, (int(icon_scale*screen_x), int(icon_scale*screen_x)))
 music_icon=pygame.transform.scale(music_icon,(int(icon_scale*screen_x), int(icon_scale*screen_x)))
+cycle_icon=pygame.transform.scale(cycle_icon,(int(0.4*music_icon.get_size()[0]),int(0.4*music_icon.get_size()[0])))
 
-#scale tiles
+#tiles
 tile_size=int(bg_board.get_size()[0]*0.1)
 tile_images=[pygame.transform.scale(img,(tile_size,tile_size)) for img in tile_images]
 
-#scale pen, pencil, and back icons
+#pen, pencil, and back icons
 pencil_icon=pygame.transform.scale(pencil_icon,(tile_size,tile_size))
 pen_icon=pygame.transform.scale(pen_icon,(tile_size,tile_size))
 back_icon=pygame.transform.scale(back_icon,(int(1.5*tile_size),tile_size))
 
-#scale logo
+#logo
 logo=pygame.transform.scale(logo,(int(1.3*tile_size),int(1.3*tile_size)))
 
-#Add alpha value to title and submenu images 
+# =============================================================================
+# ADD ALPHA CHANNELS TO IMAGES WITH OPAQUE BACKGROUNDS
+# =============================================================================
+
+#Add alpha value to title, and submenu images 
 trans_color=screen_title.get_at((0,0))
 screen_title.set_colorkey(trans_color)
 screen_submenu.set_colorkey(trans_color)
 
-#Add alpha channel to pen and back icons
+#Add alpha channel to pen, back and cycle icons
 pen_icon.set_colorkey(pen_icon.get_at((0,0)))
 back_icon.set_colorkey((255,255,255))
+cycle_icon.set_colorkey((255,255,255))
 
 
 #Screen Size
 win=pygame.display.set_mode(bg_screen.get_size())
 
 clock=pygame.time.Clock()
-
-#track the times a tile was misplayed
-errors=0
 
 #title
 pygame.display.set_caption('Pseudo Ku')
@@ -144,8 +158,9 @@ class main_page(object):
         self.menu_options=['Easy','Medium','Hard','Expert','About']
         self.font=pygame.font.SysFont('tahoma',50,bold=True)
         
-        #locations of music and sound effects icons
+        #locations of music, music cycle, and sound effects icons
         self.music_loc=(int(self.sub_menu_loc[0]*0.5-music_icon.get_size()[0]*0.5), int(self.sub_menu_loc[1]+screen_submenu.get_size()[1]*0.3))
+        self.cycle_loc=(int(self.music_loc[0]+music_icon.get_size()[0]),int(self.music_loc[1]+music_icon.get_size()[1]-cycle_icon.get_size()[1]))
         self.sound_effect_loc=(int(self.sub_menu_loc[0]*0.5-sound_effects_icon.get_size()[0]*0.5), int(self.sub_menu_loc[1]+screen_submenu.get_size()[1]*0.6))
         
     def draw(self):
@@ -165,6 +180,7 @@ class main_page(object):
         #ADD SOUND EFFECTS AND MUSIC ICONS
         win.blit(music_icon,self.music_loc)
         win.blit(sound_effects_icon,self.sound_effect_loc)
+        win.blit(cycle_icon,self.cycle_loc)
         
         
 # =============================================================================
@@ -258,6 +274,10 @@ class game_board(object):
         #logo
         self.logo_y=int(0.5*tile_size)
         self.logo_x=int(bg_screen.get_size()[0]*0.5-logo.get_size()[0]*0.5)
+        
+        #cycle-icon
+        self.cycle_x=int(self.music_x+music_icon.get_size()[0])
+        self.cycle_y=int(self.music_y+music_icon.get_size()[1]-cycle_icon.get_size()[1])
         
 
         
@@ -372,6 +392,9 @@ class game_board(object):
         #ADD ICONS FOR TURNING MUSIC AND SOUND EFFECTS ON/OFF
         win.blit(music_icon,(self.music_x,self.music_y))
         win.blit(sound_effects_icon,(self.sound_effects_x,self.sound_effects_y))
+        
+        #ADD ICON FOR CYCLING THE MUSIC
+        win.blit(cycle_icon,(self.cycle_x,self.cycle_y))
     
         #ADD A BACK BUTTON TO RETURN TO THE MAIN MENU
         win.blit(back_icon,(self.back_x,self.back_y))
@@ -469,6 +492,10 @@ def clicked(x,y):
         (dx,dy)=sound_effects_icon.get_size()
         item_locations['sound_effects_icon']=(screen.sound_effect_loc[0],screen.sound_effect_loc[1],screen.sound_effect_loc[0]+dx,screen.sound_effect_loc[1]+dy)
         
+        (dx,dy)=cycle_icon.get_size()
+        item_locations['cycle_icon']=(screen.cycle_loc[0],screen.cycle_loc[1],screen.cycle_loc[0]+dx,screen.cycle_loc[1]+dy)
+        
+        
         #LOOK TO SEE IF THE CLICK WAS ON AN ITEM
         for item in item_locations:
             x1,y1,x2,y2=item_locations[item]
@@ -511,6 +538,9 @@ def clicked(x,y):
         (dx,dy)=logo.get_size()
         item_locations['logo']=(board.logo_x,board.logo_y,board.logo_x+dx,board.logo_y+dy)
         
+        (dx,dy)=cycle_icon.get_size()
+        item_locations['cycle_icon']=(board.cycle_x,board.cycle_y,board.cycle_x+dx,board.cycle_y+dy)
+        
         #if click is on the game board, check which square was clicked
         if (x>=board.x+border_thickness and x<=board.x+grid_size-border_thickness) and (y>=board.y+border_thickness and y<=board.y+grid_size-border_thickness):
             #click was on the sudoku grid
@@ -530,7 +560,7 @@ def clicked(x,y):
 
 elapsed_time=-0.01
 def take_action(action):
-    global music_playing, sound_effects_playing
+    global music_playing, sound_effects_playing, music_cycle
     global on_game, on_menu
     global elapsed_time, clock
     global on_pen, on_pencil
@@ -580,6 +610,11 @@ def take_action(action):
         else:
             sound_effects_playing=True
             
+    if action=='cycle_icon' and music_playing:
+        music_cycle+=1
+        pygame.mixer.music.load(music_files[music_cycle%len(music_files)])
+        pygame.mixer.music.play(-1)
+            
     # =========================================================================
     # IN GAME ACTIONS (except music and sound effects which are listed above)
     # =========================================================================    
@@ -599,9 +634,7 @@ def take_action(action):
     if action=='logo':
         #Fill in the next human solvable value
         for ((x,y),val) in board.history:
-            print(x,y,val)
             if board.arr[y,x]==0:
-                print(board.arr)
                 board.arr[y,x]=val
                 board.pencil_marks[(x,y)]=[]
                 board.is_boxed=False
