@@ -56,7 +56,7 @@ pen_icon=pygame.image.load('./graphics/pen_3.jpg')
 back_icon=pygame.image.load('./graphics/back_icon.jpg')
 
 # =============================================================================
-# SET INITIAL CONDITIONS AND CONSTRAINTS AND SCALE SURFACES ACCORDING TO SCREEN
+# SET INITIAL CONDITIONS AND CONSTRAINTS AND SCALE SURFACES ACCORDING TO WINDOW SIZE
 # =============================================================================
 #Choose Screen Size
 screen_x,screen_y=450,728 #golden ratio for aesthetics
@@ -81,6 +81,9 @@ tile_images=[pygame.transform.scale(img,(tile_size,tile_size)) for img in tile_i
 pencil_icon=pygame.transform.scale(pencil_icon,(tile_size,tile_size))
 pen_icon=pygame.transform.scale(pen_icon,(tile_size,tile_size))
 back_icon=pygame.transform.scale(back_icon,(int(1.5*tile_size),tile_size))
+
+#scale logo
+logo=pygame.transform.scale(logo,(int(1.3*tile_size),int(1.3*tile_size)))
 
 #Add alpha value to title and submenu images 
 trans_color=screen_title.get_at((0,0))
@@ -169,7 +172,7 @@ class main_page(object):
 # =============================================================================
 class game_board(object):
     
-    def __init__(self,x,y,width,height,difficulty,arr,pencil_marks):
+    def __init__(self,x,y,width,height,difficulty,arr):
         self.x=x
         self.y=y
         self.width=width
@@ -181,8 +184,14 @@ class game_board(object):
         #solutin will be generated when the array is populated
         self.solution=None
         
-        #Load pencil marks (text) for all uninserted values {(x,y):[values],...}
-        self.pencil_marks=pencil_marks
+        #the history of moves ((x,y),value) used to find solution
+        self.history=None
+        
+        #Load pencil marks temporary values for all empty squares {(x,y):[values],...}
+        self.pencil_marks={}
+        self.pencil_color=(60,60,60)
+        self.pencil_font=pygame.font.SysFont('tahoma',11,bold=True)
+
         
         #difficulty for when the board is first set
         self.difficulty=difficulty
@@ -195,7 +204,6 @@ class game_board(object):
         
         #Box (highlight) the input square on a grid if it is selected by the user
         self.is_boxed=False
-        print('self.is_boxed=False')
         
         #The square is given by grid coordinates i.e. (0,0) or (4,8)
         self.boxed=None
@@ -210,6 +218,14 @@ class game_board(object):
         #grid line properties
         self.thin_line_color=(255,255,255)
         
+        #Display a warning message if true
+        self.warn=False
+        self.warning_message=''
+        self.warning_color=(200,0,0)
+        self.warning_font=pygame.font.SysFont('tahoma',25,bold=True)
+        self.warning_time=2 #seconds
+        self.warning_start=0
+        
         
         # =============================================================================
         # locations of each icon and active area
@@ -219,11 +235,11 @@ class game_board(object):
         self.input_tiles_y=int(self.y+bg_board.get_size()[1]*1.08)
         self.buffer_between_tiles=tile_size*1.05
         
-        #pen
+        #pen_icon
         self.pen_y=int(self.input_tiles_y+tile_size+0.5*(bg_screen.get_size()[1]-self.input_tiles_y-tile_size)-pen_icon.get_size()[1]*0.5)
         self.pen_x=int(0.36*bg_screen.get_size()[0]-pen_icon.get_size()[0]*0.5)
         
-        #pencil
+        #pencil_icon
         self.pencil_y=self.pen_y
         self.pencil_x=int(0.63*bg_screen.get_size()[0]-pencil_icon.get_size()[0]*0.5)
         
@@ -239,6 +255,10 @@ class game_board(object):
         self.back_y=int(0.5*tile_size)
         self.back_x=int(0.5*tile_size)
         
+        #logo
+        self.logo_y=int(0.5*tile_size)
+        self.logo_x=int(bg_screen.get_size()[0]*0.5-logo.get_size()[0]*0.5)
+        
 
         
     def draw(self):
@@ -247,7 +267,7 @@ class game_board(object):
         
         win.blit(bg_board,(self.x,self.y))
         
-        #Add lines for sudoku blocks
+        #ADD A GRID FOR THE SUDOKU TILES
         line_start_buffer=1 #[pixels] shift the beginning of the line to account for rounding errors
         #line_end_buffer=0 #[pixels] shift the end of the line to account for rounding errors
         for i in range(1,9):
@@ -257,22 +277,17 @@ class game_board(object):
             #horizontal lines
             pygame.draw.line(win,self.thin_line_color,(int(line_start_buffer+self.x+border_thickness),int(self.y+border_thickness+j*line_spacing)),(int(self.x+border_thickness+grid_size),int(self.y+border_thickness+j*line_spacing)))
                 
-        #If sudoku is not populated, populate the sudoku
+        #IF THE SUDOKU IS EMPTY POPULATE IT WITH INITIAL TILE VALUES
+        #ALSO STORE THE SOLUTION AND HISTORY OF MOVES
         if not self.board_set:
             self.arr=populate_board(self.difficulty)
             self.board_set=True
             
-            if self.difficulty=='Easy':
-                #insert 9 of one value for testing purposes
-                self.arr[8,4]=3
-                self.arr[4,5]=3
+            temp_sudoku=solve_sudoku(self.arr)
+            self.solution=temp_sudoku.arr
+            self.history=temp_sudoku.history
             
-            self.solution=solve_sudoku(self.arr).arr
-            
-            
-        
-            
-        #Add Tiles
+        #ADD TILES
         for (row,column) in product(range(9),range(9)):
             if self.arr[row,column]!=0:
                 #Blit Tile
@@ -284,13 +299,39 @@ class game_board(object):
                 text=self.font.render(str(self.arr[row,column]),1,(255,255,255))
                 win.blit(text,(int(tile_x+0.5*tile_size-0.5*text.get_size()[0]), int(tile_y+0.5*tile_size-0.5*text.get_size()[1])))
         
-        #Add thick lines for boxes
+        #ADD PENCIL MARKS
+        for square in self.pencil_marks:
+            (column,row)=square
+            square_x=int(self.x+border_thickness+column*line_spacing+(line_spacing-tile_size)/2)
+            square_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
+            
+            #make pencil text 3 numbers separated by commas and only three numbers per row i.e.:
+            #1, 2, 3
+            #5, 7, 9
+            text=''
+            for idx,number in enumerate(sorted(self.pencil_marks[square])):
+                text+=str(number)
+                if (idx+1)%3!=0:
+                    text+=', '
+                else:
+                    text+='-'
+            
+            #make 1 to 3 rows of text to blit separately
+            input_text=text.split('-')
+            
+            #Blit Text
+            for idx,text in enumerate(input_text):
+                text=self.pencil_font.render(text,1,self.pencil_color)
+                height=(idx-1)*text.get_size()[1]
+                win.blit(text,(int(square_x+0.5*tile_size-0.5*text.get_size()[0]), int(square_y+0.5*tile_size-0.5*text.get_size()[1]+height)))
+        
+        #ADD THICK LINES FOR BOXES
         for i in range(1,3):
             pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness),(self.x+border_thickness+3*i*line_spacing,self.y+border_thickness+grid_size),self.thick_line_thickness)
         for j in range(1,3):
             pygame.draw.line(win,self.thick_line_color,(self.x+border_thickness,self.y+border_thickness+3*j*line_spacing),(self.x+border_thickness+grid_size,self.y+border_thickness+3*j*line_spacing),self.thick_line_thickness)
 
-        #Highlight a box if the user is focusing on it to insert a value
+        #HIGHLIGHT A BOX IF THE USER IS FOCUSING ON THE BOX TO INSERT A VALUE
         if self.is_boxed:
             if type(self.boxed)==tuple:
                 column,row=self.boxed[0],self.boxed[1]
@@ -304,7 +345,7 @@ class game_board(object):
                     tile_y=int(self.y+border_thickness+row*line_spacing+(line_spacing-tile_size)/2)
                     pygame.draw.rect(win,self.box_color,(tile_x,tile_y,tile_size,tile_size),3)
             
-        #Add a line of tiles below the grid
+        #ADD A LINE OF TILES BELOW THE GRID (INPUT BOXES)
         count=0
         for surf in tile_images:
             #Add row of tiles at location (surf_x,surf_y)
@@ -324,19 +365,21 @@ class game_board(object):
                 text=self.font.render(str(count),1,(0,0,0))
             win.blit(text,(int(surf_x+0.5*tile_size-0.5*text.get_size()[0]), int(surf_y+0.5*tile_size-0.5*text.get_size()[1])))
         
-        #Add a pen and pencil below the boxes that will be used to switch
-        #between writing potential values and permanent values
+        #ADD PEN AND PENCIL ICON BELOW THE INPUT BOXES
         win.blit(pen_icon,(self.pen_x,self.pen_y))
         win.blit(pencil_icon,(self.pencil_x,self.pencil_y))
         
-        #Add sound effects and music button on game page too
+        #ADD ICONS FOR TURNING MUSIC AND SOUND EFFECTS ON/OFF
         win.blit(music_icon,(self.music_x,self.music_y))
         win.blit(sound_effects_icon,(self.sound_effects_x,self.sound_effects_y))
     
-        #Add a back button to return to the main menu
+        #ADD A BACK BUTTON TO RETURN TO THE MAIN MENU
         win.blit(back_icon,(self.back_x,self.back_y))
         
-        #Add a timer in the top right corner
+        #ADD LOGO AS SECRET HELPER BUTTON
+        win.blit(logo,(self.logo_x,self.logo_y))
+        
+        #ADD A GAME TIMER
         elapsed_time+=clock.tick()/1000
         zeros='00'
         if elapsed_time>=3600:
@@ -353,6 +396,15 @@ class game_board(object):
         time_y=int(0.5*tile_size)
         time_x=int(bg_screen.get_size()[0]-0.5*tile_size-text.get_size()[0])
         win.blit(text,(time_x,time_y))
+        
+        
+        #BLIT WARNING MESSAGE IF ANY
+        if self.warning_time+self.warning_start>=elapsed_time:
+            message_x=int(0.5*bg_screen.get_size()[0])
+            message_y=int(board.y)
+            text=self.warning_font.render(self.warning_message,1,self.warning_color)
+            win.blit(text,(int(message_x-text.get_size()[0]*0.5),int(message_y-text.get_size()[1])))
+
 
 # =============================================================================
 # GENERATE INITIAL VALUES BASED ON SELECTED DIFFICULTY
@@ -360,7 +412,7 @@ class game_board(object):
 def populate_board(difficulty):
     return np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_'+difficulty.lower()+'.txt',delimiter=' '),'int')
 
-def solve_sudoku(arr):
+def solve_sudoku(arr):    
     arr=hs.sudoku(arr)
     arr.square_by_square
     if int(arr.percent())!=100:
@@ -370,7 +422,9 @@ def solve_sudoku(arr):
     if int(arr.percent())==100:
         return arr
     else:
-        print('This sudoku is not solvable without resorting to brute force methods.')
+        print('The resulting sudoku would not be solvable by human methods.\n')
+        board.warning_message='The resulting sudoku would not be solvable by human methods.'
+        board.warning_start=elapsed_time
         return None
 
 
@@ -454,6 +508,9 @@ def clicked(x,y):
         (dx,dy)=back_icon.get_size()
         item_locations['back_icon']=(board.back_x,board.back_y,board.back_x+dx,board.back_y+dy)
         
+        (dx,dy)=logo.get_size()
+        item_locations['logo']=(board.logo_x,board.logo_y,board.logo_x+dx,board.logo_y+dy)
+        
         #if click is on the game board, check which square was clicked
         if (x>=board.x+border_thickness and x<=board.x+grid_size-border_thickness) and (y>=board.y+border_thickness and y<=board.y+grid_size-border_thickness):
             #click was on the sudoku grid
@@ -480,6 +537,9 @@ def take_action(action):
     global difficulty
     global focus, is_focused
     global board, screen
+    global oops_count
+    
+    pygame.time.delay(100)
     
     # =========================================================================
     # MAIN MENU ACTIONS   
@@ -487,8 +547,11 @@ def take_action(action):
     if action in ['Easy','Medium','Hard','Expert']:
         #set game difficulty
         difficulty=action
+        oops_count=0
         
-        board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None,None)
+        board=game_board(0,120,bg_board.get_size()[0],bg_board.get_size()[1],difficulty,None)
+        
+        elapsed_time=0
         
         #Switch menu off and game on
         on_game,on_menu=on_menu,on_game
@@ -533,6 +596,18 @@ def take_action(action):
     if action=='pen_icon':
         on_pen,on_pencil=True,False
         
+    if action=='logo':
+        #Fill in the next human solvable value
+        for ((x,y),val) in board.history:
+            print(x,y,val)
+            if board.arr[y,x]==0:
+                print(board.arr)
+                board.arr[y,x]=val
+                board.pencil_marks[(x,y)]=[]
+                board.is_boxed=False
+                break
+        return None
+        
     if action[0]=='(':
         #Note the location on the grid that was clicked by making it
         #the square of focus
@@ -570,9 +645,10 @@ def take_action(action):
             #make boxes green
             board.box_color=(0,200,0)
     
-    #If a number is clicked in the input number row located below the board
+    
+    #If a number is clicked in the input number row and pen is on for permanent inputs
     input_numbers=[str(i) for i in range(1,10)]
-    if action in input_numbers:
+    if (action in input_numbers) and on_pen:
         if type(board.boxed)!=tuple:
             #take no action if a valid input square is not already selected
             return None
@@ -594,11 +670,13 @@ def take_action(action):
             #make boxes green
             board.box_color=(0,200,0)
             
-        elif type(board.boxed)==tuple and board.solution[board.boxed]==int(action):
+        elif type(board.boxed)==tuple and board.solution[board.boxed[::-1]]==int(action):
             #If a box is selected and the input value matches the solution
-            #add the input value into the array
-            board.arr[board.boxed]=int(action)
-        elif type(board.boxed)==tuple and board.solution[board.boxed]!=int(action):
+            #add the input value into the array, unbox the square and remove pencil marks
+            board.arr[board.boxed[::-1]]=int(action)
+            board.is_boxed=False
+            board.pencil_marks[board.boxed]=[]
+        elif type(board.boxed)==tuple and board.solution[board.boxed[::-1]]!=int(action):
             #an input was inserted, but it does not agree with the solution
             violation=True
             
@@ -612,18 +690,43 @@ def take_action(action):
                         violation=False
             
             if violation:
-                print('This is not a valid entry')
+                print('This is not a valid entry')  
+                board.warning_message='Not a valid entry.'
+                board.warning_start=elapsed_time
                 return None
 
             #if the value is not in violation of box, row or column rules
             #check to see if a solution exists to the array with the new input value
-            if solve_sudoku(test_arr)!=None:
+            if solve_sudoku(test_arr.arr)!=None:
                 board.arr[board.boxed[::-1]]=int(action)
+                board.is_boxed=False
+                board.pencil_marks[board.boxed]=[]
             else:
-                print('This entry leads to an unsolvable puzzle')
+                print('This entry would lead to an unsolvable puzzle.')
+                board.warning_message='Entry makes sudoku unsolvable.'
+                board.warning_start=elapsed_time
+                oops_count+=1
                 return None
         
-    
+        
+    #IF A NUMBER IS CLICKED IN INPUT ROW AND PENCIL IS ON FOR TEMPORARY MARKING
+    if (action in input_numbers) and on_pencil:
+        if type(board.boxed)!=tuple:
+            #take no action if a valid input square is not already selected
+            return None
+        if board.boxed in board.pencil_marks.keys():
+            #the box has been marked by a pencil before
+            if int(action) in board.pencil_marks[board.boxed]:
+                #the pencil mark is in the box already, remove it
+                board.pencil_marks[board.boxed].remove(int(action))
+                return None
+            else:
+                #the pencil mark is not already in the box, so lets add it
+                board.pencil_marks[board.boxed].append(int(action))
+        else:
+            #The box has not been touched by pencil before so lets add the first mark
+            board.pencil_marks[board.boxed]=[int(action)]
+
 
 # =============================================================================
 # REDRAW GAME WINDOW     
@@ -644,16 +747,16 @@ on_pen=True
 on_pencil=False
 
 def redrawGameWindow():
-    
     #add wooden screen background
     win.blit(bg_screen,(0,0))
     
     if on_menu:
         screen.draw()
-    
-    if on_game:
+        
+    if on_game:          
         #add board     
         board.draw()
+        
 
         
     pygame.display.update()
@@ -669,9 +772,12 @@ is_focused=False
 #Text for screen (bold and italiscized)
 font = pygame.font.SysFont('comicsans', 30,True)
 
+#Track mistakes made
+oops_count=0
+
 run = True
 while run:
-    #slow the game so it only blits every 100/1000 seconds
+    #slow the game so it only blits every n/1000 seconds
     pygame.time.delay(50)
     
     #get list of all events that happen i.e. keyboard, mouse, ...
