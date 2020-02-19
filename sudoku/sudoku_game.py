@@ -450,7 +450,7 @@ def populate_board(difficulty):
     return np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_'+difficulty.lower()+'.txt',delimiter=' '),'int')
 
 def solve_sudoku(arr):    
-    arr=hs.sudoku(arr)
+    arr=hs.sudoku(arr=arr)
     arr.square_by_square
     if int(arr.percent())!=100:
         #if the square by square method did not completely solve the suodku try solving pair by pari
@@ -738,7 +738,7 @@ def take_action(action):
             
             #check if the input value violates any box, row or column rules
             input_col,input_row=board.boxed[0],board.boxed[1]
-            test_arr=hs.sudoku(board.arr)
+            test_arr=hs.sudoku(arr=board.arr)
             test_arr.insert(board.boxed[0],board.boxed[1],int(action))
             if list(test_arr.cols()[input_col]).count(int(action))==1:
                 if list(test_arr.rows()[input_row]).count(int(action))==1:

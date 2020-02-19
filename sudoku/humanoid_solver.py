@@ -7,8 +7,7 @@ Created on Sat Feb 15 15:01:18 2020
 Big picture:
     
 Write a script that solves a sudoku using the same techniques that a human would
-use 
-    --maybe rely on brute force tactics if there are only a few empty squares remaining
+use, avoid using slow brute force tactics like backtracking.
 
 The purpose of this will be to check if a sudoku is solvable by a human from
 a given state and then to list the human method used for each insertion
@@ -19,14 +18,25 @@ import numpy as np
 from itertools import product
 
 class sudoku(object):
-    def __init__(self, arr):
+    def __init__(self, arr=np.full((9,9),0)):
         self.arr=np.array(arr)
         
         #Track the history of how the sudoku was solved
         self.history=[]
         
+        #Track the history of how the sudoku was generated
+        self.generation=[]
+        
+        #Track the most complex human pair system used to solve the puzzle 
+        #i.e: {2,3,4}, {2,3,4}, {2,3,4,5}, {2,3,4}, {2,3,4,5,6} --> square 3 is 5 and square 5 is 6
+        #self.pair_difficulty=3 because triple-bonded pairs were used to solve the puzzle
+        self.pair_difficulty=1
+        
         #Remember how the array looked before solving
         self._locked_arr=self.arr
+        
+        #turn on print for debugging
+        self.print=False
         
     def show(self):
         print(self.arr)
@@ -65,8 +75,9 @@ class sudoku(object):
         '''
         Return what percent of the sudoku is complete
         
-        sudoku.percent()
-        >>>52.5
+        In : s=sudoku(arr=arr)
+        In : s.percent()
+        Out: 52.5
         '''
         return round(100*(1-len(self.arr[self.arr==0])/81),2)
         
@@ -108,16 +119,19 @@ class sudoku(object):
                     #Check to see if there is only one possible value
                     intersecting_values=col_set.intersection(row_set.intersection(box_set))
                     if len(intersecting_values)==0:
-                        print('No value satisfies position ({},{}), previous error exists.'.format(x,y))
+                        if self.print:
+                            print('No value satisfies position ({},{}), previous error exists.'.format(x,y))
                         return None
                     if len(intersecting_values)==1:
                         #insert the value into the sudoku at location (x,y)
                         true_value=intersecting_values.pop()
                         self.insert(x,y,true_value)
-                        #print('({},{}) is {} according to square_by_square method.'.format(x,y,true_value))
+                        if self.print:
+                            print('({},{}) is {} according to square_by_square method.'.format(x,y,true_value))
                         found_values+=1
             new_values_found=found_values
-            print('{} new values inserted into sudoku.'.format(new_values_found))
+            if self.print:
+                print('{} new values inserted into sudoku.'.format(new_values_found))
     
     def all_possible_values(self):
         '''
@@ -152,7 +166,8 @@ class sudoku(object):
                 #Check to see if there is only one possible value
                 intersecting_values=col_set.intersection(row_set.intersection(box_set))
                 if len(intersecting_values)==0:
-                    print('No value satisfies position ({},{}), previous error exists.'.format(x,y))
+                    if self.print:
+                        print('No value satisfies position ({},{}), previous error exists.'.format(x,y))
                 elif len(intersecting_values)==1:
                     #insert the value into the sudoku at location (x,y)
                     true_value=intersecting_values.pop()
@@ -193,8 +208,9 @@ class sudoku(object):
                     else:
                         new_col_dict[k]=col_dict[k]
                 bonded_pair_count+=1
-                #print(new_col_dict)
-                #print()
+                if self.print:
+                    print(new_col_dict)
+                    print()
         
         # =============================================================================
         # UPDATE DICTIONARY OF POSSIBLE VALUES AND FILL IN ANY DEFNITE SQUARES         
@@ -209,7 +225,7 @@ class sudoku(object):
                 self.updated_possible_values[key]=new_col_dict[key]
     
 
-    def pair_by_pair(self):
+    def pair_by_pair(self,highest_pair=8):
         '''
         perform all square_by_square operations and create a dictionary
         consisting of:
@@ -228,15 +244,17 @@ class sudoku(object):
         or no new sets are found.  
         '''
         
-
         max_pair=3
-        while max_pair<8:
+        while max_pair<=highest_pair:
             #Start by only looking for doubles (becaues its fast)
             #If the problem is not solved with doubles, switch to doubles and triples
-            #and so on until we are looking for pairs of 8
+            #and so on until the puzzle is solved or we end up looking for bonded pairs of length 8
             if int(self.percent())==100:
-                max_pair=9
+                max_pair=highest_pair+1
                 continue
+            
+            if max_pair>self.pair_difficulty:
+                self.pair_difficulty=max_pair
             
             #Continuallly look for pairs, triplets and quadruplets to reduce the possible
             #values for each space until no forward progress is made or the puzzle is solved
@@ -244,7 +262,8 @@ class sudoku(object):
             while progress>0:
                 #percentage of the puzzle solved before checking for pairs is pre_loop progress
                 preloop_progress=self.percent()
-                #print(self.percent())
+                if self.print:
+                    print(self.percent())
                 for pair_size in range(2,max_pair+1):
                     #self.updated_possible_values contains all possible values for each sudoku square
                     self.updated_possible_values=self.all_possible_values()
@@ -318,74 +337,55 @@ class sudoku(object):
                 if value not in digits:
                     return False
         return True
-    
-    def most_restricted_square(self):
         
-        max_pair=2
-          
-        #Continuallly look for pairs, triplets and quadruplets to reduce the possible
-        #values for each space until no forward progress is made or the puzzle is solved
-        progress=1
-        while progress>0:
-            #percentage of the puzzle solved before checking for pairs is pre_loop progress
-            preloop_progress=self.percent()
-            print(self.percent())
+    
+    def generate_complete_sudoku(self):
+
+        self.arr=np.full((9,9),0)
+        
+        #INITIALIZE SUDOKU WITH RANDOM VALUES THAT UNDERCONSTRAIN THE SUDOKU
+        #fill in first row and three values in second row first box
+        for idx in range(12):
+            x,y=idx%9,idx//9
+            if self.arr[y,x]==0:
+                self.arr[y,x]=np.random.choice([i for i in self.possible_values_at(x,y)])
+                
+                #track sudoku generation pattern
+                self.generation.append(((x,y),self.arr[y,x]))
+       
+        #FILL THE MOST CONSTRAINED BOX WITH A VALID GUESS AND REPEAT UNTIL PUZZLE IS SOLVED
+        count=0
+        while np.sum(s.arr==0)>0:
+            self.pair_by_pair(highest_pair=3)
             
-            #self.updated_possible_values contains all possible values for each sudoku square
-            self.updated_possible_values=self.all_possible_values()
-            for pair_size in range(2,max_pair+1):
-                '''
-                Cross reference the possible values for each square that match other squares
-                located in the same row, a column or a box
-                
-                the values contained in identical pairs, triplets or quadruplets 
-                cannot exist in squares outside of the pair
-                
-                #i.e. square1 can be {2,3} square2 can be {2,3} square5 can be {2,3,6} 
-                therefore square5 must be {6} because square1 and square2 must be {2} or {3}.  
-                '''
-            
-                # =================================================================
-                # CHECK FOR BONDED PAIRS IN COLUMNS                 
-                # =================================================================
-                for x in range(0,9):
-                    col_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if k[0]==x}
-                    #User helper function to find pairs, deduce impossible values
-                    #and update the sudoku board when definite values are found
-                    self._pair_by_pair(col_dict,pair_size)
-                    
-                # =================================================================
-                # CHECK FOR BONDED PAIRS IN ROWS                 
-                # =================================================================
-                for y in range(0,9):
-                    row_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if k[0]==y} 
-                    #User helper function to find pairs, deduce impossible values
-                    #and update the sudoku board when definite values are found
-                    self._pair_by_pair(row_dict,pair_size)     
-                
-                # =============================================================================
-                # CHECK FOR BONDED PAIRS IN BOXES
-                # =============================================================================
-                for box in range(0,9):
-                    box_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if self.in_box(k[0],k[1])==box}
-                    #User helper function to find pairs, deduce impossible values
-                    #and update the sudoku board when definite values are found
-                    self._pair_by_pair(box_dict,pair_size)   
-                    
-            progress=self.percent()-preloop_progress
-        max_pair+=1
+            #insert random value from acceptable choices into the most constrained square
+            constrained_squares=[k for k in self.updated_possible_values if self.updated_possible_values[k]==min(self.updated_possible_values.values(),key=len)]
+            if len(constrained_squares)==0:
+                #puzzle is complete
+                break
+            self.arr[constrained_squares[0][::-1]]=np.random.choice([i for i in self.updated_possible_values[constrained_squares[0]]])
+            count+=1
+            if self.print:
+                print(self.arr)
+        
+        print('puzzle fully generated')
+        print(self.arr)
         
         
     
-    def make_sudoku(self,difficulty):
+    def generate_sudoku_puzzle(self,difficulty):
         '''
-        Populate sudoku with 17 random inputs that do not conflict with sudoku rules
+        0) Generate a list of all mirrored pairs and scramble the list
+        1) One at a time remove a mirrored pair from the completed sudoku (i.e. s.arr[3,2]=0 and s.arr[2,3]=0)
+        2) Check whether the puzzle is still solvable
+                If not: replace the piece and try the next mirrored pair
+                
+        3) Generate a list of all locations that are filled in and scramble the list
+        4) One at a time remove the value from the sudoku (i.e. s.arr[5,4]=0)
+        5) Check whether the puzzle is still solvable
+    
+        6) Add 
         
-        Test whether sudoku is solvable by methods used in this class (if so it is unique)
-        
-        While sudoku is not unique:
-            add another random value that does not conflict
-            check if sudoku is unique
         
         if expert: return sudoku
         if hard: return sudoku + 5 random inputs from solution history
@@ -396,71 +396,12 @@ class sudoku(object):
             print('Difficulty must be in ["easy","medium","hard","expert"]')
             return None
         
-        self.arr=s(np.full((9,9),0))
-        
-        for idx in range(12):
-            x,y=idx%9,idx//9
-            if self.arr[y,x]==0:
-                self.arr[y,x]=np.random.choice([i for i in self.possible_values_at(x,y,self.arr)])
-        
-        print(self.arr)
-        
-        #Insert random acceptable value into the 
+        return None
         
         
-        
-        '''
-        
-        
-        while True:
-            temp_arr=sudoku(arr)
-            temp_arr.square_by_square()
-            temp_arr.pair_by_pair()
-            if int(temp_arr.percent())==100:
-                #arr is now a unique sudoku with solution hist [((x,y),value),((x,y),value),...]
-                hist=temp_arr.history()
-                break
-            else:
-                #add another value to arr
-                x,y=np.random.randint(0,9),np.random.randint(0,9)
-                while arr[y,x]!=0:
-                    x,y=np.random.randint(0,9),np.random.randint(0,9)
-                
-                possible_values=self.possible_values_at(x,y,arr)
-                arr[y,x]=np.random.choice([i for i in possible_values])
-            
-            if np.sum(arr==0)<33:
-                print('The sudoku was converging on an impossible solution.')
-                print('Resetting sudoku to 17 random values.')
-                arr=np.full((9,9),0)
-        
-                while np.sum(arr==0)>81-17:
-                    #pick a random location on arr that is not filled in
-                    x,y=np.random.randint(0,9),np.random.randint(0,9)
-                    while arr[y,x]!=0:
-                        x,y=np.random.randint(0,9),np.random.randint(0,9)
-                        
-                    possible_values=self.possible_values_at(x,y,arr)
-                    arr[y,x]=np.random.choice([i for i in possible_values])
-        
-        
-        given_values={'expert':0,
-                      'hard':5,
-                      'medium':10,
-                      'easy':15}
-    
-        for i in range(given_values[difficulty]):
-            #pick a random entry from the solution
-            ((x,y),value)=np.random.choice(hist)
-            while arr[y,x]!=0:
-                #if that entry was already selected try again
-                ((x,y),value)=np.random.choice(hist)
-            arr[y,x]=value
-        
-        return arr
-        '''
 
-    def possible_values_at(self,x,y,temp_arr):
+
+    def possible_values_at(self,x,y):
         '''
         returns a list of all possible values for a given square:
         
@@ -468,107 +409,30 @@ class sudoku(object):
             Out: [1,3,6,7,8,9]
         '''        
         
-        temp_array=sudoku(temp_arr)
-       
         #check column for unused values
         col_set=set()            
         for value in range(1,10):
-            if value not in temp_array.cols()[x]:
+            if value not in self.cols()[x]:
                 col_set.add(value)
         
         #check row for unused values
         row_set=set()
         for value in range(1,10):
-            if value not in temp_array.rows()[y]:
+            if value not in self.rows()[y]:
                 row_set.add(value)
         
         #check box for unused values
         box_set=set()
         for value in range(1,10):
-            if value not in temp_array.list_boxes()[temp_array.in_box(x,y)]:
+            if value not in self.list_boxes()[self.in_box(x,y)]:
                 box_set.add(value)
                 
         #Check to see if there is only one possible value
         intersecting_values=col_set.intersection(row_set.intersection(box_set))
-        print(intersecting_values)
+        if self.print:
+            print(intersecting_values)
         return intersecting_values
     
-
-    
-def make_sudoku():
-    '''
-    Populate sudoku with 17 random inputs that do not conflict with sudoku rules
-    
-    Test whether sudoku is solvable by methods used in this class (if so it is unique)
-    
-    While sudoku is not unique:
-        add another random value that does not conflict
-        check if sudoku is unique
-    
-    if expert: return sudoku
-    if hard: return sudoku + 5 random inputs from solution history
-    if medium: return sudoku + 10 random inputs from solution history
-    if easy: return sudoku + 15 random inputs from solution history
-    '''
-    
-    #    if difficulty.lower() not in ['easy','medium','hard','expert']:
-    #        print('Difficulty must be in ["easy","medium","hard","expert"]')
-    #        return None
-    
-    arr=np.full((9,9),0)
-    
-    #populate every third square with a value
-    #make three lists of values where two of the same number are never at the same index
-    values_1=np.array([i for i in range(1,10)])
-    values_2=np.array([i for i in range(1,10)])
-    values_3=np.array([i for i in range(1,10)])
-    
-    np.random.shuffle(values_1)
-    np.random.shuffle(values_2)
-    np.random.shuffle(values_3)
-    
-    #rearrange second list to not conflict with first list
-    for idx in [0,3,6]:
-        #if values in middle row of boxes align with first row, rotate columns in the offending middle boxes
-        while np.sum(values_2[idx:idx+3]==values_1[idx:idx+3])>0:
-            temp=[values_2[idx+2],values_2[idx],values_2[idx+1]]
-            values_2[idx:idx+3]=temp
-
-    #rearrange third list to not conflict with first or second list
-    for idx in [0,3,6]:
-        #if values in bottom row of boxes align with first or second row, rotate columns in the offending bottom boxes
-        count=0
-        while True:
-            column_1=values_3[idx] not in [values_2[idx],values_1[idx]]
-            column_2=values_3[idx+1] not in [values_2[idx+1],values_1[idx+1]]
-            column_3=values_3[idx+2] not in [values_2[idx+2],values_1[idx+2]]
-            if column_1 and column_2 and column_3:
-                #box values do not interfere with boxes above it
-                break
-            else:
-                #rotate columns in the box until the above conditions are met
-                temp=[values_3[idx+2],values_3[idx],values_3[idx+1]]
-                values_3[idx:idx+3]=temp
-                count+=1
-                if count%3==0:
-                    #no permuation will satisfy column requirements: shuffle all values in bottom row of boxes
-                    np.random.shuffle(values_3)
-                    print('shuffling')
-    
-    #Load list values into the sudoku array
-    box_row=0
-    for input_values in [values_1,values_2,values_3]:
-        column=0
-        row=column%3
-        for value in input_values:
-            arr[3*box_row+row,column]=value
-            column+=1
-            row=column%3 #stagger values diagonally across box
-        box_row+=1
-    
-    
-    
-    return(arr)
 
 
     
@@ -576,41 +440,18 @@ if __name__=='__main__':
     #load array as allinteger values
     arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_expert.txt',delimiter=' '),'int')
     
-    '''
+    
     #create sudoku object using array
     s=sudoku(arr)
     s.show()
     s.square_by_square()
     s.pair_by_pair()
     s.show()
+    
+    
     '''
-    
-
-    #arr=make_sudoku()
-    print(arr)
-    print()
-    arr=np.full((9,9),0)
-    s=sudoku(arr)
-    
-    for idx in range(12):
-        x,y=idx%9,idx//9
-        if s.arr[y,x]==0:
-            s.arr[y,x]=np.random.choice([i for i in s.possible_values_at(x,y,s.arr)])
-    print(s.arr)
-    
-    count=0
-    while np.sum(s.arr==0)>0:
-        s.pair_by_pair()
-        
-        #insert random value from acceptable choices into the most constrained square
-        constrained_squares=[k for k in s.updated_possible_values if s.updated_possible_values[k]==min(s.updated_possible_values.values(),key=len)]
-        if len(constrained_squares)==0:
-            break
-        s.arr[constrained_squares[0][::-1]]=np.random.choice([i for i in s.updated_possible_values[constrained_squares[0]]])
-        count+=1
-        if count%10==0:
-            print(s.arr)
-    
+    s=sudoku()
+    s.generate_complete_sudoku()
     print(s.arr)
     print('Valid Sudoku:',s.valid())
-    
+    '''
