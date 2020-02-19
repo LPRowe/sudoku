@@ -118,7 +118,6 @@ class sudoku(object):
                         found_values+=1
             new_values_found=found_values
             print('{} new values inserted into sudoku.'.format(new_values_found))
-
     
     def all_possible_values(self):
         '''
@@ -318,8 +317,124 @@ class sudoku(object):
                     return False
         return True
     
+    def make_sudoku(self,difficulty):
+        '''
+        Populate sudoku with 17 random inputs that do not conflict with sudoku rules
+        
+        Test whether sudoku is solvable by methods used in this class (if so it is unique)
+        
+        While sudoku is not unique:
+            add another random value that does not conflict
+            check if sudoku is unique
+        
+        if expert: return sudoku
+        if hard: return sudoku + 5 random inputs from solution history
+        if medium: return sudoku + 10 random inputs from solution history
+        if easy: return sudoku + 15 random inputs from solution history
+        '''
+        if difficulty.lower() not in ['easy','medium','hard','expert']:
+            print('Difficulty must be in ["easy","medium","hard","expert"]')
+            return None
+        
+        arr=np.full((9,9),0)
+        
+        while np.sum(arr==0)>81-17:
+            #pick a random location on arr that is not filled in
+            x,y=np.random.randint(0,9),np.random.randint(0,9)
+            while arr[y,x]!=0:
+                x,y=np.random.randint(0,9),np.random.randint(0,9)
+                
+            possible_values=self.possible_values_at(x,y,arr)
+            print(possible_values)
+            arr[y,x]=np.random.choice([i for i in possible_values])
+        
+        while True:
+            temp_arr=sudoku(arr)
+            temp_arr.square_by_square()
+            temp_arr.pair_by_pair()
+            if int(temp_arr.percent())==100:
+                #arr is now a unique sudoku with solution hist [((x,y),value),((x,y),value),...]
+                hist=temp_arr.history()
+                break
+            else:
+                #add another value to arr
+                x,y=np.random.randint(0,9),np.random.randint(0,9)
+                while arr[y,x]!=0:
+                    x,y=np.random.randint(0,9),np.random.randint(0,9)
+                
+                possible_values=self.possible_values_at(x,y,arr)
+                arr[y,x]=np.random.choice([i for i in possible_values])
+            
+            if np.sum(arr==0)<33:
+                print('The sudoku was converging on an impossible solution.')
+                print('Resetting sudoku to 17 random values.')
+                arr=np.full((9,9),0)
+        
+                while np.sum(arr==0)>81-17:
+                    #pick a random location on arr that is not filled in
+                    x,y=np.random.randint(0,9),np.random.randint(0,9)
+                    while arr[y,x]!=0:
+                        x,y=np.random.randint(0,9),np.random.randint(0,9)
+                        
+                    possible_values=self.possible_values_at(x,y,arr)
+                    arr[y,x]=np.random.choice([i for i in possible_values])
+        
+        
+        given_values={'expert':0,
+                      'hard':5,
+                      'medium':10,
+                      'easy':15}
     
+        for i in range(given_values[difficulty]):
+            #pick a random entry from the solution
+            ((x,y),value)=np.random.choice(hist)
+            while arr[y,x]!=0:
+                #if that entry was already selected try again
+                ((x,y),value)=np.random.choice(hist)
+            arr[y,x]=value
+            
+        return arr
+
+    def possible_values_at(self,x,y,temp_arr):
+        '''
+        returns a list of all possible values for a given square:
+        
+            In:  possible_values_at(3,4)
+            Out: [1,3,6,7,8,9]
+        '''        
+        
+        temp_array=sudoku(temp_arr)
+       
+        #check column for unused values
+        col_set=set()            
+        for value in range(1,10):
+            if value not in temp_array.cols()[x]:
+                col_set.add(value)
+        
+        #check row for unused values
+        row_set=set()
+        for value in range(1,10):
+            if value not in temp_array.rows()[y]:
+                row_set.add(value)
+        
+        #check box for unused values
+        box_set=set()
+        for value in range(1,10):
+            if value not in temp_array.list_boxes()[temp_array.in_box(x,y)]:
+                box_set.add(value)
+                
+        #Check to see if there is only one possible value
+        intersecting_values=col_set.intersection(row_set.intersection(box_set))
+        print(intersecting_values)
+        return intersecting_values
     
+class generateSudoku(object):
+    
+    def __init__(self,difficulty):
+        pass
+        
+
+
     
 if __name__=='__main__':
     #load array as allinteger values
