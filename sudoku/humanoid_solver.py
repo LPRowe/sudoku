@@ -428,11 +428,82 @@ class sudoku(object):
         print(intersecting_values)
         return intersecting_values
     
-class generateSudoku(object):
+
     
-    def __init__(self,difficulty):
-        pass
-        
+def make_sudoku():
+    '''
+    Populate sudoku with 17 random inputs that do not conflict with sudoku rules
+    
+    Test whether sudoku is solvable by methods used in this class (if so it is unique)
+    
+    While sudoku is not unique:
+        add another random value that does not conflict
+        check if sudoku is unique
+    
+    if expert: return sudoku
+    if hard: return sudoku + 5 random inputs from solution history
+    if medium: return sudoku + 10 random inputs from solution history
+    if easy: return sudoku + 15 random inputs from solution history
+    '''
+    
+    #    if difficulty.lower() not in ['easy','medium','hard','expert']:
+    #        print('Difficulty must be in ["easy","medium","hard","expert"]')
+    #        return None
+    
+    arr=np.full((9,9),0)
+    
+    #populate every third square with a value
+    #make three lists of values where two of the same number are never at the same index
+    values_1=np.array([i for i in range(1,10)])
+    values_2=np.array([i for i in range(1,10)])
+    values_3=np.array([i for i in range(1,10)])
+    
+    np.random.shuffle(values_1)
+    np.random.shuffle(values_2)
+    np.random.shuffle(values_3)
+    
+    #rearrange second list to not conflict with first list
+    for idx in [0,3,6]:
+        #if values in middle row of boxes align with first row, rotate columns in the offending middle boxes
+        while np.sum(values_2[idx:idx+3]==values_1[idx:idx+3])>0:
+            temp=[values_2[idx+2],values_2[idx],values_2[idx+1]]
+            values_2[idx:idx+3]=temp
+
+    #rearrange third list to not conflict with first or second list
+    for idx in [0,3,6]:
+        #if values in bottom row of boxes align with first or second row, rotate columns in the offending bottom boxes
+        count=0
+        while True:
+            column_1=values_3[idx] not in [values_2[idx],values_1[idx]]
+            column_2=values_3[idx+1] not in [values_2[idx+1],values_1[idx+1]]
+            column_3=values_3[idx+2] not in [values_2[idx+2],values_1[idx+2]]
+            if column_1 and column_2 and column_3:
+                #box values do not interfere with boxes above it
+                break
+            else:
+                #rotate columns in the box until the above conditions are met
+                temp=[values_3[idx+2],values_3[idx],values_3[idx+1]]
+                values_3[idx:idx+3]=temp
+                count+=1
+                if count%3==0:
+                    #no permuation will satisfy column requirements: shuffle all values in bottom row of boxes
+                    np.random.shuffle(values_3)
+                    print('shuffling')
+    
+    #Load list values into the sudoku array
+    box_row=0
+    for input_values in [values_1,values_2,values_3]:
+        column=0
+        row=column%3
+        for value in input_values:
+            arr[3*box_row+row,column]=value
+            column+=1
+            row=column%3 #stagger values diagonally across box
+        box_row+=1
+    
+    
+    
+    return(arr)
 
 
     
@@ -440,21 +511,27 @@ if __name__=='__main__':
     #load array as allinteger values
     arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_expert.txt',delimiter=' '),'int')
     
+    '''
     #create sudoku object using array
     s=sudoku(arr)
-    
     s.show()
-    print(s.percent())
-
     s.square_by_square()
-
-    print(s.percent())
-
-
     s.pair_by_pair()
-    
     s.show()
+    '''
+    
 
+    arr=make_sudoku()
+    print(arr)
+    print()
+    s=sudoku(arr)
+    
+    for idx in range(81):
+        x,y=idx%9,idx//9
+        if s.arr[y,x]==0:
+            s.arr[y,x]=np.random.choice([i for i in s.possible_values_at(x,y,s.arr)])
+    print(s.arr)
+    
     
     
     
