@@ -177,6 +177,8 @@ class sudoku(object):
                 
                 if 4... or 5...
         '''
+        #within this helper function col_dict is general for row, column or box 
+        #based on what is in the input value_dict
         col_dict=value_dict
         
         bonded_pair_count=0
@@ -240,9 +242,9 @@ class sudoku(object):
             #values for each space until no forward progress is made or the puzzle is solved
             progress=1
             while progress>0:
-                #progress before looking for pairs is pre_loop progress
+                #percentage of the puzzle solved before checking for pairs is pre_loop progress
                 preloop_progress=self.percent()
-                print(self.percent())
+                #print(self.percent())
                 for pair_size in range(2,max_pair+1):
                     #self.updated_possible_values contains all possible values for each sudoku square
                     self.updated_possible_values=self.all_possible_values()
@@ -317,6 +319,64 @@ class sudoku(object):
                     return False
         return True
     
+    def most_restricted_square(self):
+        
+        max_pair=2
+          
+        #Continuallly look for pairs, triplets and quadruplets to reduce the possible
+        #values for each space until no forward progress is made or the puzzle is solved
+        progress=1
+        while progress>0:
+            #percentage of the puzzle solved before checking for pairs is pre_loop progress
+            preloop_progress=self.percent()
+            print(self.percent())
+            
+            #self.updated_possible_values contains all possible values for each sudoku square
+            self.updated_possible_values=self.all_possible_values()
+            for pair_size in range(2,max_pair+1):
+                '''
+                Cross reference the possible values for each square that match other squares
+                located in the same row, a column or a box
+                
+                the values contained in identical pairs, triplets or quadruplets 
+                cannot exist in squares outside of the pair
+                
+                #i.e. square1 can be {2,3} square2 can be {2,3} square5 can be {2,3,6} 
+                therefore square5 must be {6} because square1 and square2 must be {2} or {3}.  
+                '''
+            
+                # =================================================================
+                # CHECK FOR BONDED PAIRS IN COLUMNS                 
+                # =================================================================
+                for x in range(0,9):
+                    col_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if k[0]==x}
+                    #User helper function to find pairs, deduce impossible values
+                    #and update the sudoku board when definite values are found
+                    self._pair_by_pair(col_dict,pair_size)
+                    
+                # =================================================================
+                # CHECK FOR BONDED PAIRS IN ROWS                 
+                # =================================================================
+                for y in range(0,9):
+                    row_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if k[0]==y} 
+                    #User helper function to find pairs, deduce impossible values
+                    #and update the sudoku board when definite values are found
+                    self._pair_by_pair(row_dict,pair_size)     
+                
+                # =============================================================================
+                # CHECK FOR BONDED PAIRS IN BOXES
+                # =============================================================================
+                for box in range(0,9):
+                    box_dict={k:self.updated_possible_values[k] for k in self.updated_possible_values if self.in_box(k[0],k[1])==box}
+                    #User helper function to find pairs, deduce impossible values
+                    #and update the sudoku board when definite values are found
+                    self._pair_by_pair(box_dict,pair_size)   
+                    
+            progress=self.percent()-preloop_progress
+        max_pair+=1
+        
+        
+    
     def make_sudoku(self,difficulty):
         '''
         Populate sudoku with 17 random inputs that do not conflict with sudoku rules
@@ -336,17 +396,21 @@ class sudoku(object):
             print('Difficulty must be in ["easy","medium","hard","expert"]')
             return None
         
-        arr=np.full((9,9),0)
+        self.arr=s(np.full((9,9),0))
         
-        while np.sum(arr==0)>81-17:
-            #pick a random location on arr that is not filled in
-            x,y=np.random.randint(0,9),np.random.randint(0,9)
-            while arr[y,x]!=0:
-                x,y=np.random.randint(0,9),np.random.randint(0,9)
-                
-            possible_values=self.possible_values_at(x,y,arr)
-            print(possible_values)
-            arr[y,x]=np.random.choice([i for i in possible_values])
+        for idx in range(12):
+            x,y=idx%9,idx//9
+            if self.arr[y,x]==0:
+                self.arr[y,x]=np.random.choice([i for i in self.possible_values_at(x,y,self.arr)])
+        
+        print(self.arr)
+        
+        #Insert random acceptable value into the 
+        
+        
+        
+        '''
+        
         
         while True:
             temp_arr=sudoku(arr)
@@ -392,8 +456,9 @@ class sudoku(object):
                 #if that entry was already selected try again
                 ((x,y),value)=np.random.choice(hist)
             arr[y,x]=value
-            
+        
         return arr
+        '''
 
     def possible_values_at(self,x,y,temp_arr):
         '''
@@ -521,18 +586,31 @@ if __name__=='__main__':
     '''
     
 
-    arr=make_sudoku()
+    #arr=make_sudoku()
     print(arr)
     print()
+    arr=np.full((9,9),0)
     s=sudoku(arr)
     
-    for idx in range(81):
+    for idx in range(12):
         x,y=idx%9,idx//9
         if s.arr[y,x]==0:
             s.arr[y,x]=np.random.choice([i for i in s.possible_values_at(x,y,s.arr)])
     print(s.arr)
     
+    count=0
+    while np.sum(s.arr==0)>0:
+        s.pair_by_pair()
+        
+        #insert random value from acceptable choices into the most constrained square
+        constrained_squares=[k for k in s.updated_possible_values if s.updated_possible_values[k]==min(s.updated_possible_values.values(),key=len)]
+        if len(constrained_squares)==0:
+            break
+        s.arr[constrained_squares[0][::-1]]=np.random.choice([i for i in s.updated_possible_values[constrained_squares[0]]])
+        count+=1
+        if count%10==0:
+            print(s.arr)
     
-    
-    
+    print(s.arr)
+    print('Valid Sudoku:',s.valid())
     
