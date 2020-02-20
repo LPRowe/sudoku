@@ -15,6 +15,7 @@ one at a time
 """
 
 import numpy as np
+from location_value_tree import SudokuTree, ValNode, LocNode
 from itertools import product
 
 class sudoku(object):
@@ -311,7 +312,92 @@ class sudoku(object):
                         
                 progress=self.percent()-preloop_progress
             max_pair+=1
+            
+    def guess_and_check(self):
         
+        def sort_children(names):
+            
+            return int(name[-1])
+        
+        constrained_squares=[k for k in self.updated_possible_values if self.updated_possible_values[k]==min(self.updated_possible_values.values(),key=len)]
+        
+        #Create a sudoku tree for each start location
+        root_count=0 #number of trees
+        roots=[]
+        for idx,location in enumerate(constrained_squares):
+            roots.append(SudokuTree(location,constrained_squares[location]))
+            root_count+=1
+        
+        #cycle through all possible solutions stemming from each start guess
+        for root in roots:
+            
+            #When all paths from a node do not lead to a solution that node dies (i.e. node.alive=False)
+            while root.alive==True:
+                #create a temporary instance of current array
+                temp=sudoku(self.arr)
+                
+                
+                temp.arr[root.value[::-1]]=root.child0
+                
+                pass
+
+        
+        
+    
+    def grind(self):
+        '''
+        This should only be called if two conditions are met:
+            1) pair by pair does not find any solutions, even after looking for 
+               doulble-bound through octuple-bound pairs (max_pair=2 through 8)
+            2) s.updated_possible_values has no empty values (i.e. (3,2):{} )
+               this would signify a previous error was made
+        
+        1) Set a attempt_count to zero
+    
+        while solution not found:
+            2) temp_count=attempt_count
+            3) Find the most constrained square
+                i.e. the shortest value in s.updated_possible_values
+                     if there is a tie choose the one that occurs first in the dictionary
+            4) Guess a value for that square as:
+                if len(s.updated_possible_values[(x,y)])>temp_count:
+                    temp.arr[y,x]=s.updated_possible_values[(x,y)][temp_count]
+                    temp_count=0
+                else:
+                    temp.arr[y,x]=s.updated_possible_values[(x,y)][-1]
+                    temp_count-=len(s.updated_possible_values[(x,y)])
+            
+                This will ensure that a different combination of guesses is tried each attempt
+            
+            5) check if puzzle is solved
+                if int(s.percent)==100:
+                    #puzzle is solved!
+                    break
+                else:
+                    step 6
+                        
+            6) Check if a solution is still viable
+                check=min(s.updated_possible_values_possible_values.values(),key=len)!=0
+                if check==False:
+                    loop back to step 3
+                else:
+                    attempt_count+=1
+                    loop back to step 2
+        '''
+        return 
+    
+        attempt_count=0
+        
+        while True:
+            print(attempt_count)
+            
+            #used to ensure a new path of guesses is chosen each attempt
+            temp_count=attempt_count
+            
+            constrained_squares=[k for k in self.updated_possible_values if self.updated_possible_values[k]==min(self.updated_possible_values.values(),key=len)]
+            
+            #Find which square and value to try based on temp_count
+            
     
     def valid(self):
         '''
@@ -369,7 +455,6 @@ class sudoku(object):
                 print(self.arr)
         
         print('puzzle fully generated')
-        print(self.arr)
         
         
     
@@ -438,20 +523,147 @@ class sudoku(object):
     
 if __name__=='__main__':
     #load array as allinteger values
-    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_expert.txt',delimiter=' '),'int')
+    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
     
-    
+    '''
     #create sudoku object using array
     s=sudoku(arr)
+    print(s.percent())
     s.show()
     s.square_by_square()
     s.pair_by_pair()
     s.show()
+    print(s.percent())
     
+    print(s.pair_difficulty)
+    '''
     
     '''
     s=sudoku()
     s.generate_complete_sudoku()
     print(s.arr)
     print('Valid Sudoku:',s.valid())
+    
+    '''
+    
+    s=sudoku(arr=arr)
+    s.pair_by_pair()
+    
+    def sort_children(names):
+        return ['child{}'.format(i) for i in range(len(names))]
+    
+    
+    temp=sudoku(s.arr)
+    temp.pair_by_pair()
+    
+    constrained_squares=[k for k in temp.updated_possible_values if temp.updated_possible_values[k]==min(temp.updated_possible_values.values(),key=len)]
+    
+    #Create a sudoku tree for each start location
+    root_count=0 #number of trees
+    roots=[]
+    for idx,location in enumerate(constrained_squares):
+        roots.append(SudokuTree(location,temp.updated_possible_values[location],temp.arr))
+        root_count+=1
+    
+    
+    root=roots[0].root
+                
+    def build_and_prune(root):
+        curr=root
+        print('b')
+        #if all child nodes are dead move up to parent node
+        if np.sum([eval('curr.{}.alive'.format(child)) for child in [name for name in dir(curr) if 'child' in name]])==0:
+            curr.alive=False
+            print('a')
+            print([eval('curr.{}.alive'.format(child)) for child in [name for name in dir(curr) if 'child' in name]])
+            try:
+                build_and_prune(curr.parent)
+            except:
+                pass
+            print('Dead branch.')
+            return curr.parent.arr
+        else:
+            #At least one child is alive
+            #Check if the current node is a location node
+            if type(curr.value)==tuple:
+                print('c')
+                for child in sort_children([name for name in dir(curr) if 'child' in name]):
+                    kid=eval('curr.{}'.format(child))
+                    if kid.alive:
+                        #Child is alive and is an integer: add to array
+                        #temp.arr[curr.value[::-1]]=eval('curr.{}.value'.format(child))
+                        curr.arr[curr.value[::-1]]=kid.value
+                        
+                        temp=sudoku(curr.arr)
+                        temp.pair_by_pair()
+                        if temp.percent()==100:
+                            print(temp.show())
+                            return temp.arr
+                        curr.arr=temp.arr
+                        #Generate grand children that are locations (x,y)
+                        constrained_squares=[k for k in temp.updated_possible_values if temp.updated_possible_values[k]==min(temp.updated_possible_values.values(),key=len)]
+                        
+                        #If the child will produce no children and the sudoku is not solved kill the child node
+                        if len(constrained_squares)==100:
+                            kid.alive=False
+                            continue
+                        else:
+                            #Remake the child value node so that it contains children as well
+                            kid=ValNode(curr,kid.value,constrained_squares,curr.arr)
+                            build_and_prune(kid)
+                        
+            #Check if the current node is a value node
+            elif type(curr.value)==int:
+                print('d')
+                for child in sort_children([name for name in dir(curr) if 'child' in name]):
+                    kid=eval('curr.{}'.format(child))
+                    if kid.alive:
+                        #No need to upate the array when on a value node since single value entries are handled in LocNode loop
+                        
+                        temp=sudoku(curr.arr)
+                        temp.pair_by_pair()
+                        if temp.percent()==100:
+                            print(temp.show())
+                            return temp.arr
+                        curr.arr=temp.arr
+                        
+                        print(temp.updated_possible_values)
+                        #generate grandchildren that are values
+                        try:
+                            grandchildren=temp.updated_possible_values[kid.value]
+                        except:
+                            kid.alive=False
+                            continue
+                        print('grandchildren')
+                        print(grandchildren)
+                        print(temp.updated_possible_values)
+                        if len(grandchildren)==0:
+                            kid.alive=False
+                            continue
+                        else:
+                            #Remake child value node so that it contains children as well
+                            kid=LocNode(curr,kid.value,list(grandchildren),curr.arr)
+                            build_and_prune(kid)
+
+            else:
+                print('e')
+                curr=curr.parent
+                build_and_prune(curr)
+                
+
+    build_and_prune(root)
+                
+    '''
+    #cycle through all possible solutions stemming from each start guess
+    for root in roots:
+        
+        #When all paths from a node do not lead to a solution that node dies (i.e. node.alive=False)
+        while root.alive==True:
+            #create a temporary instance of current array
+            temp=sudoku(self.arr)
+            
+            
+            temp.arr[root.value[::-1]]='child'
+            
+            pass
     '''
