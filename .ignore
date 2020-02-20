@@ -1,1 +1,4 @@
 sudoku/sudoku_game_backup.py
+sudoku/backtracking_solver_smart.py
+sudoku/location_value_tree.py
+sudoku/aside_tree_solver.py
