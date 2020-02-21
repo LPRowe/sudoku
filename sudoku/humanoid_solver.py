@@ -196,7 +196,7 @@ class sudoku(object):
     
     def _pair_by_pair(self,value_dict,pair_size):
         '''
-        Helper function for pair by pair
+        Helper function for pair_by_pair()
         
         value_dict: {(x,y):(1,2,3),(x,y):(2,3,6)...} is location and possible values
                 for (x,y) values that reside in the same row, box, or column exclusively
@@ -239,6 +239,8 @@ class sudoku(object):
                 if len(new_col_dict[key])==1:
                     true_value=new_col_dict[key].pop()
                     self.insert(key[0],key[1],true_value)
+                    self.count_intelligent+=1
+                    self.history_intelligent[key[1],key[0]]=self.count_intelligent
                 self.updated_possible_values[key]=new_col_dict[key]
     
 
@@ -429,6 +431,8 @@ class sudoku(object):
                 here, but since the increase in solve time due to its disuse is 
                 negligible, I will leave it for the time being.  
         '''
+        global solved_sudoku
+        
         arr=sudoku(arr)
         
         #MEMOISATION:
@@ -455,6 +459,7 @@ class sudoku(object):
         elif int(arr.percent())==100:
             #if there are no empty squares then the puzzle is solved
             s.arr=arr.arr
+            solved_sudoku=arr
             return True
         else:
             self.backtrack_count+=1
@@ -468,8 +473,8 @@ class sudoku(object):
         
         for val in arr.updated_possible_values[(x,y)]:
             #check if input is valid (we know its valid)
-            self.count_intelligent+=1
             arr.arr[y,x]=val
+            self.count_intelligent+=1
             self.history_intelligent[y,x]=self.count_intelligent
             if self.solve_intelligent(arr.arr):
                 return True
@@ -598,7 +603,43 @@ class sudoku(object):
         return intersecting_values
     
 
-
+def complete_intelligent_history(history_intelligent,solved_sudoku):
+    '''
+    When backtracking is used the history of the game solution
+    gets scrambled and must be reconstructed
+    
+    h=complete_intelligent_history(s.history_intelligent,solved_sudoku)
+    
+    where solved_sudoku is a global instance of the class sudoku
+        - solved_sudoku.arr has full solution
+        - solved_sudoku.history has missing history
+        
+        -s.history_intelligent has the remaining history of the game
+        
+    h=[((x,y),value),((x,y),value),...] in sequential order of the tiles played
+    
+    as always, x is column and y is row
+    '''   
+    history_arr=history_intelligent
+    count=np.max(history_arr)+1
+    for data in solved_sudoku.history:
+        x,y=data[0]
+        history_arr[y,x]=count
+        count+=1
+    
+    print(history_arr)
+    
+    history=[]
+    
+    #load history smallest count number first
+    history_arr-=np.max(history_arr)
+    while np.sum(history_arr==1)<81:
+        idx=np.argmin(history_arr)
+        x,y=idx%9,idx//9
+        history.append(((x,y),solved_sudoku.arr[y,x]))
+        history_arr[y,x]=1
+    
+    return history
     
 if __name__=='__main__':
     import time
