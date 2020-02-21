@@ -24,20 +24,6 @@ class sudoku(object):
         #Track the history of how the sudoku was solved
         self.history=[]
         
-        #Track the history of how a sudoku was solved using solve_intelligent() (i.e. with backtracking)
-        self.history_intelligent=np.full((9,9),0)
-        
-        #helper counter to keep track of the order values were added to history_intelligent
-        self.count_intelligent=0
-        
-        #almost all sudokus require 0 backtracking to solve, if backtrack_count>0 after solving, the puzzle is rated expert+
-        self.backtrack_count=0
-        
-        #pres_to_future={array_present.tobyte():(array_future.tobyte(),updated_possible_values),...}
-        #tracks the state of a sudoku before and after solving with pair_by_pair and uses
-        #memoisation techniques to utilize the information when solving with backtracking
-        self.pres_to_future={}
-        
         #Track the history of how the sudoku was generated
         self.generation=[]
         
@@ -49,33 +35,27 @@ class sudoku(object):
         #Remember how the array looked before solving
         self._locked_arr=self.arr
         
-        #self.print=True only when debugging
+        #turn on print for debugging
         self.print=False
         
     def show(self):
         print(self.arr)
         
     def insert(self,x,y,value):
-        '''Inserts a value into the sudoku where x is column and y is row'''
         self.arr[y,x]=value
         self.history.append(((x,y),value))
         
     def rows(self):
-        '''Returns a list of the rows in the sudoku'''
         return [row for row in self.arr]
     
     def cols(self):
-        '''Returns a list of columns in the sudoku'''
         return [col for col in np.transpose(self.arr)]
     
     def boxes(self):
-        '''returns a list of boxes in the column, see in_box() for details about box locations'''
         self.dx=self.dy=3
         return [box for box in [self.arr[i*self.dx:(i+1)*self.dx,j*self.dy:(j+1)*self.dy] for (i,j) in product(range(0,3),range(0,3))]]
     
     def list_boxes(self):
-        '''returns a list of the boxes in the sudoku array [[box0],[box1],[box2],...]
-        see in_box() for details about the box locations'''
         return [np.reshape(box,(-1,)) for box in self.boxes()]
     
     @staticmethod
@@ -154,8 +134,10 @@ class sudoku(object):
                 print('{} new values inserted into sudoku.'.format(new_values_found))
     
     def all_possible_values(self):
-        '''Returns a dictoinary of {(x,y):[1,3,5],(x,y):[2,4,6,9]} for all empty
-        spaces on the sudoku board'''
+        '''
+        Returns a dictoinary of {(x,y):[1,3,5],(x,y):[2,4,6,9]} for all empty
+        spaces on the sudoku board
+        '''
         #Use a dictionary to track what values could go in location (x,y)
         possible_values={}
         
@@ -247,32 +229,18 @@ class sudoku(object):
         perform all square_by_square operations and create a dictionary
         consisting of:
             
-        possible_values={(x,y):{2,8,9}, (x,y):{2,8}, (x,y):{2,8}, ...}
+        possible_values={frozenset(x,y):[1,3,7], frozenset(x,y):[2,8], ...}
         
-        then checks each column, row, and box to see if any share two (x,y)
-        locations that are both only missing the same two values i.e. {2,8}
+        then check each column, row, and box to see if any share two (x,y)
+        that are both missing the same [8,2]
         
         When such a set is found, remove 2 and 8 for all other squares in the
         same row, column and/or box (whichever they are shared in)
         
         If any square now has only one value, fill it in.  
         
-            In the example possible_values shown above, if all three squares share
-            a row, column, or box, the first square would be filled in with value 9.
-        
-        Recheck for new pairs (or triplets or quadruplets or...) and repeat 
-        until a new value is inserted or no new sets are found.  
-        
-        UPDATE 02/21/2020: 
-            Extensive testing has shown highest_pair=3 is sufficient to solve
-            almost any sudoku.  In general, it is also the most efficient value 
-            to use.  
-            
-            For sudokus that require highest pair of 4 (i.e. 4 boxes that all
-            are only missing the same 4 values) it is more efficient to
-            use the hybrid pair_by_pair and backtracking method called
-            solve_intelligent() than to increase the highest_pair value in
-            pair_by_pair().
+        Recheck for new pairs (or triplets) and repeat until a new value is inserted
+        or no new sets are found.  
         '''
         
         max_pair=3
@@ -343,7 +311,7 @@ class sudoku(object):
                 progress=self.percent()-preloop_progress
             max_pair+=1
     
-    def _mostConstrainedSquare(self,updated_possible_values_dict):
+    def _mostConstrainedSquare(updated_possible_values_dict):
         '''
         This is a helper function for self.solve_intelligent()
         
@@ -361,122 +329,8 @@ class sudoku(object):
         #there are no empty squares
         return False
     
-
-    def solve_intelligent(self,arr):
-        '''
-        THE BEST METHOD FOR SOLVING SUDOKUS (of those in this class)
+    def solve_intelligent(self):
         
-        solve_intelligent(arr) where arr is an unsolved sudoku, will use human
-        methods (such as those in pair_by_pair) to completely solve almost any
-        sudoku.  
-        
-        
-        In : arr=[[0 8 0 0 0 0 0 0 0]
-                  [0 0 1 0 2 5 8 4 3]
-                  [0 0 0 0 3 0 0 0 6]
-                  [0 0 0 3 0 8 1 0 0]
-                  [9 0 0 0 5 0 0 0 8]
-                  [0 0 4 2 0 9 0 0 0]
-                  [4 0 0 0 8 0 0 0 0]
-                  [6 2 7 4 1 0 9 0 0]
-                  [0 0 0 0 0 0 0 2 0]
-        In : s=sudoku(arr)
-        In : s.solve_intelligent(s.arr)
-        In : s.show()
-        Out: [[3 8 5 6 7 4 2 1 9]
-              [7 6 1 9 2 5 8 4 3]
-              [2 4 9 8 3 1 7 5 6]
-              [5 7 6 3 4 8 1 9 2]
-              [9 3 2 1 5 7 4 6 8]
-              [8 1 4 2 6 9 5 3 7]
-              [4 9 3 5 8 2 6 7 1]
-              [6 2 7 4 1 3 9 8 5]
-              [1 5 8 7 9 6 3 2 4]]
-        
-        For sudoku that cannot be solved by the methods used in pair_by_pair alone
-        solve_intelligent() will:
-            1) Store the current array (array.tobyte()) in its current state
-               as a key in pres_to_future dict
-            2) Use pair_by_pair() to fill in any squares where a definite correct
-               value exists              
-            3) When the sudoku array is at a state where a squares value must 
-               be guessed before moving forward, update pres_to_future dict
-               with tuple (array.tobyte(),updated_possible_values)
-               
-                   Note: steps 1-3 are for memoisation so if we return to
-                   the above board state after making a wrong guess, we do not
-                   need to rerun pair_by_pair().  Instead we can simply:
-                       
-                       array.arr=pres_to_future[array.arr.tobyte()][0] #get array state after pair_by_pair
-                       array.arr=np.frombuffer(array.arr,dtype='int32').reshape((9,9),0) #convert back to array from string of bytes
-                       array.updated_possible_values=pres_to_future[array.arr.tobytes()][1] #list of possible values for all squares after pair_by_pair
-            
-            3) Find the most constrained square a.k.a. the square with the fewest possible options            
-            4) Check if the array is 100% solved, if so set s.arr=arr.arr
-            5) Check if the most constrained square has any options
-                    
-                - if not a wrong guess was previously made return False -
-            
-            6) Of the possible values for the most constrained square, try each
-               value, calling solve_intelligent() recursively
-               
-                - if the value does not lead to a solution, reset it to 0 -
-                - if it does lead to a solution, step 4 will be triggered -
-                
-                
-            UPDATE 02/21/2020:
-                I have not found a sudoku that utilizes the memoisation section
-                here, but since the increase in solve time due to its disuse is 
-                negligible, I will leave it for the time being.  
-        '''
-        arr=sudoku(arr)
-        
-        #MEMOISATION:
-        #If a pair by pair solving process has already been done for the given board
-        #skip to the end result using pres_to_future dictionary otherwise run the 
-        #pair_by_pair solver and add the result to pres_to_future
-        hashed_sudoku_present=arr.arr.tobytes()
-        if hashed_sudoku_present in self.pres_to_future.keys():
-            arr.arr=np.frombuffer(self.pres_to_future[hashed_sudoku_present][0],dtype='int32').reshape((9,9))
-            arr.updated_possible_values=self.pres_to_future[hashed_sudoku_present][1]
-            print('hash_used')
-        else:
-            #Try solving arr and use possible values (paired down) as tries
-            arr.pair_by_pair(highest_pair=3)
-            hashed_sudoku_future=arr.arr.tobytes()
-            #future_possible_values=arr.updated_possible_values
-            self.pres_to_future[hashed_sudoku_present]=(hashed_sudoku_future,arr.updated_possible_values)
-        
-        if self.print:
-            print(arr.updated_possible_values)
-            
-        if len(arr.updated_possible_values)>0:
-            next_loc=self._mostConstrainedSquare(arr.updated_possible_values)
-        elif int(arr.percent())==100:
-            #if there are no empty squares then the puzzle is solved
-            s.arr=arr.arr
-            return True
-        else:
-            self.backtrack_count+=1
-            return False    
-        
-        x,y=next_loc
-        
-        if tuple((x,y)) not in arr.updated_possible_values:
-            self.backtrack_count+=1
-            return False
-        
-        for val in arr.updated_possible_values[(x,y)]:
-            #check if input is valid (we know its valid)
-            self.count_intelligent+=1
-            arr.arr[y,x]=val
-            self.history_intelligent[y,x]=self.count_intelligent
-            if self.solve_intelligent(arr.arr):
-                return True
-            
-            arr.arr[y,x]=0
-        
-        return False
     
     def valid(self):
         '''
@@ -601,20 +455,15 @@ class sudoku(object):
 
     
 if __name__=='__main__':
-    import time
     #load array as allinteger values
-    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
+    arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_expert.txt',delimiter=' '),'int')
     
     
     #create sudoku object using array
     s=sudoku(arr)
     print(s.percent())
     s.show()
-    #s.pair_by_pair(highest_pair=3)
-    t0=time.time()
-    s.solve_intelligent(s.arr)
-    t1=time.time()
-    print(1000*(t1-t0))
+    s.pair_by_pair(highest_pair=3)
     s.show()
     print(s.percent())
     

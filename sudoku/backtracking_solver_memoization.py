@@ -9,17 +9,13 @@ import numpy as np
 from humanoid_solver import sudoku
 import time
 
-arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
+difficulties=['easy','medium','hard','expert','inkala']
+difficulty=difficulties[-1]
+arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_'+difficulty+'.txt',delimiter=' '),'int')
 
 s=sudoku(arr)
-
-def firstEmptySquare(arr):
-    for x in range(9):
-        for y in range(9):
-            if arr[y,x]==0:
-                return(x,y)
-    #No empty squares
-    return False
+#s.arr[0,1]=1
+#s.arr[0,2]=2
 
 def mostConstrainedSquare(updated_possible_values_dict):
     '''
@@ -42,31 +38,43 @@ def valid_input(arr,val,loc):
         return True
     return False
 
-hist=np.full((9,9),0)
 count=0
-
+pres_to_future={} #returns future state of board given a present state of the board
+backtrack_count=0
 def solve(arr):
-    global solution, hist, count
+    global solution, hist, count, pres_to_future, backtrack_count
     arr=sudoku(arr)
     
-    #Try solving arr and use possible values (paired down) as tries
-    arr.pair_by_pair(highest_pair=3)
-    for val in arr.history:
-        count+=1
-        hist[val[0][1],val[0][0]]=count
+    #MEMOISATION:
+    #If a pair by pair solving process has already been done for the given board
+    #skip to the end result using pres_to_future dictionary otherwise run the 
+    #pair_by_pair solver and add the result to pres_to_future
+    hashed_sudoku_present=arr.arr.tobytes()
+    if hashed_sudoku_present in pres_to_future.keys():
+        arr.arr=np.frombuffer(pres_to_future[hashed_sudoku_present][0],dtype='int32').reshape((9,9))
+        arr.updated_possible_values=pres_to_future[hashed_sudoku_present][1]
+        print('hash_used')
+    else:
+        #Try solving arr and use possible values (paired down) as tries
+        arr.pair_by_pair(highest_pair=3)
+        hashed_sudoku_future=arr.arr.tobytes()
+        #future_possible_values=arr.updated_possible_values
+        pres_to_future[hashed_sudoku_present]=(hashed_sudoku_future,arr.updated_possible_values)
     
-    find=mostConstrainedSquare(arr.updated_possible_values)
+    next_loc=mostConstrainedSquare(arr.updated_possible_values)
     
     if int(arr.percent())==100:
         #if there are no empty squares then the puzzle is solved
         solution=arr
         return True
-    elif not find:
+    elif not next_loc:
+        backtrack_count+=1
         return False
     else:
-        x,y=find
+        x,y=next_loc
     
     if tuple((x,y)) not in arr.updated_possible_values:
+        backtrack_count+=1
         return False
     
     for val in arr.updated_possible_values[(x,y)]:

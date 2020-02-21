@@ -26,8 +26,9 @@ def valid_input(arr,val,loc):
         return True
     return False
 
+backtrack_count=0
 def solve(arr):
-    global solution
+    global solution, backtrack_count
     arr=sudoku(arr)
     find=firstEmptySquare(arr.arr)
     
@@ -46,6 +47,7 @@ def solve(arr):
         
         arr.arr[y,x]=0
     
+    backtrack_count+=1
     return False
 
 s.show()
