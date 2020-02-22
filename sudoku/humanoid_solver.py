@@ -509,40 +509,66 @@ class sudoku(object):
         return True
         
     
-    def generate_full_sudoku(self):
+    def _generate_full_sudoku(self):
+        '''
+        This is a helper function for create_puzzle()
+        
+        1) Creates a 9 by 9 sudoku with all zero values
+        2) Randomly fills (in accordance with sudoku rules) row 0 and the first 3 values of row 1
+        3) Procedes to solve the sudoku one square at a time focusing on the most constrained square first
+        4) If the sudoku is valid (which is true roughly 95% of the time) then it updates s.arr with a full sudoku
+                  - if the sudoku is invalid, repeat steps 1-4
 
-        self.arr=np.full((9,9),0)
+        Returns
+        -------
+        None.
+
+        '''
+        if int(self.percent())==100:
+            #This way _generate_full_sudoku can be run while on the main page
+            #and will not need to be rerun after the difficulty is selected
+            #this should reduce the wait time between selecting a puzzle difficulty
+            #and seeing the puzzle
+            return None
         
-        #INITIALIZE SUDOKU WITH RANDOM VALUES THAT UNDERCONSTRAIN THE SUDOKU
-        #fill in first row and three values in second row first box
-        for idx in range(12):
-            x,y=idx%9,idx//9
-            if self.arr[y,x]==0:
-                self.arr[y,x]=np.random.choice([i for i in self.possible_values_at(x,y)])
-                
-                #track sudoku generation pattern
-                self.generation.append(((x,y),self.arr[y,x]))
-       
-        #FILL THE MOST CONSTRAINED BOX WITH A VALID GUESS AND REPEAT UNTIL PUZZLE IS SOLVED
-        count=0
-        while np.sum(s.arr==0)>0:
-            self.pair_by_pair(highest_pair=3)
+        while True:
+            self.arr=np.full((9,9),0)
             
-            #insert random value from acceptable choices into the most constrained square
-            constrained_squares=[k for k in self.updated_possible_values if self.updated_possible_values[k]==min(self.updated_possible_values.values(),key=len)]
-            if len(constrained_squares)==0:
-                #puzzle is complete
+            #INITIALIZE SUDOKU WITH RANDOM VALUES THAT UNDERCONSTRAIN THE SUDOKU
+            #fill in first row and three values in second row first box
+            for idx in range(12):
+                x,y=idx%9,idx//9
+                if self.arr[y,x]==0:
+                    self.arr[y,x]=np.random.choice([i for i in self.possible_values_at(x,y)])
+                    
+                    #track sudoku generation pattern
+                    self.generation.append(((x,y),self.arr[y,x]))
+           
+            #FILL THE MOST CONSTRAINED BOX WITH A VALID GUESS AND REPEAT UNTIL PUZZLE IS SOLVED
+            count=0
+            while np.sum(s.arr==0)>0:
+                self.pair_by_pair(highest_pair=3)
+                
+                #insert random value from acceptable choices into the most constrained square
+                constrained_squares=[k for k in self.updated_possible_values if self.updated_possible_values[k]==min(self.updated_possible_values.values(),key=len)]
+                if len(constrained_squares)==0:
+                    #puzzle is complete
+                    break
+                self.arr[constrained_squares[0][::-1]]=np.random.choice([i for i in self.updated_possible_values[constrained_squares[0]]])
+                count+=1
+                if self.print:
+                    print(self.arr)
+                
+            self.show()
+            if self.valid():
+                print('Puzzle fully generated.')
                 break
-            self.arr[constrained_squares[0][::-1]]=np.random.choice([i for i in self.updated_possible_values[constrained_squares[0]]])
-            count+=1
-            if self.print:
-                print(self.arr)
-        
-        print('puzzle fully generated')
+            else:
+                print('Oops, that puzzle is broken.  Please wait one second for me to fix it.')
         
         
     
-    def generate_sudoku_puzzle(self,difficulty):
+    def create_puzzle(self,difficulty):
         '''
         0) Generate a list of all mirrored pairs and scramble the list
         1) One at a time remove a mirrored pair from the completed sudoku (i.e. s.arr[3,2]=0 and s.arr[2,3]=0)
@@ -562,10 +588,64 @@ class sudoku(object):
         if easy: return sudoku + 15 random inputs from solution history
         '''
         if difficulty.lower() not in ['easy','medium','hard','expert']:
-            print('Difficulty must be in ["easy","medium","hard","expert"]')
+            print('Difficulty must be in ["easy","medium","hard","expert","guru"]')
             return None
         
-        return None
+        #CREATE A VALID SUDOKU THAT IS 100% COMPLETE
+        self._generate_full_sudoku()
+        
+        # =============================================================================
+        # ITERATIVELY REMOVE VALUES FROM SUDOKU AND CHECK IF IT IS STILL SOLVABLE
+        # =============================================================================
+        
+        #Create a random ordered list of all of the tile locations in the top 
+        #right half of the board
+        locations=[]
+        for (x,y) in product(range(9),range(9)):
+            if x>=y:
+                locations.append((x,y)) #x is column and y is row
+                        
+        #ranomize the order of the locations where tiles will be removed
+        np.random.shuffle(locations)
+        
+        #ITERATIVELY REMOVE VALUES ONLY IF THEY DO NOT MAKE THE PUZZLE UNSOLVABLE
+        for loc in locations:
+            v1,v2=self.arr[loc],self.arr[loc[::-1]]
+            
+            self.arr[loc],self.arr[loc[::-1]]=0,0
+            static_arr=sudoku(self.arr)
+            static_arr.pair_by_pair()
+                        
+            if static_arr.percent()!=100:
+                self.arr[loc],self.arr[loc[::-1]]=v1,v2
+        
+        hard_sudoku=self.arr
+        print(np.sum(hard_sudoku!=0))
+        print(hard_sudoku)
+        
+        
+        if difficulty=='expert':
+            #Remove a few more tiles to challenge the sudoku experts
+            locations=np.where(self.arr!=0) #remaining nonzero values
+            locations=[i for i in zip(locations[0],locations[1])] #(x,y) format
+            
+            np.random.shuffle(locations)
+            
+            #Iteratively remove any locations that can be removed
+            for loc in locations:
+                v1=self.arr[loc[::-1]]
+                
+                self.arr[loc[::-1]]=0
+                static_arr=sudoku(self.arr)
+                static_arr.pair_by_pair()
+                            
+                if static_arr.percent()!=100:
+                    self.arr[loc[::-1]]=v1
+                    
+        expert_sudoku=self.arr
+        
+        print(np.sum(expert_sudoku!=0))
+            
         
         
 
@@ -646,7 +726,7 @@ if __name__=='__main__':
     #load array as allinteger values
     arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
     
-    
+    '''
     #create sudoku object using array
     s=sudoku(arr)
     print(s.percent())
@@ -660,12 +740,24 @@ if __name__=='__main__':
     print(s.percent())
     
     print(s.pair_difficulty)
-    
-    
     '''
+    '''
+    #Generate Full Sudoku
+    while True:
+        s=sudoku()
+        s.generate_full_sudoku()
+        print(s.arr)
+        print('Valid Sudoku:',s.valid())
+        if s.valid():
+            break
+
+    #Remove random mirrored tiles and check if sudoku is solvable until none can be removed
+    '''
+    
     s=sudoku()
-    s.generate_complete_sudoku()
-    print(s.arr)
-    print('Valid Sudoku:',s.valid())
-    
-    '''
+    s._generate_full_sudoku()
+    t0=time.time()
+    s.create_puzzle('hard')
+    t1=time.time()
+    print(1000*(t1-t0))
+    s.show()
