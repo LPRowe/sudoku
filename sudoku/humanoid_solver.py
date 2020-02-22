@@ -52,6 +52,15 @@ class sudoku(object):
         #self.print=True only when debugging
         self.print=False
         
+        #store a copy of each difficulty level puzzle for rapid recall on game startup
+        self.easy_puzzle=None
+        self.medium_puzzle=None
+        self.hard_puzzle=None
+        self.expert_puzzle=None
+        
+        #store a temporary solution to the puzzle
+        self.solution=None
+        
     def show(self):
         print(self.arr)
         
@@ -564,7 +573,7 @@ class sudoku(object):
                 print('Puzzle fully generated.')
                 break
             else:
-                print('Oops, that puzzle is broken.  Please wait one second for me to fix it.')
+                print('Oops, this puzzle is broken.  Please wait a second while I get you a new one.')
         
         
     
@@ -594,6 +603,8 @@ class sudoku(object):
         #CREATE A VALID SUDOKU THAT IS 100% COMPLETE
         self._generate_full_sudoku()
         
+        self.solution=np.copy(self.arr)
+        
         # =============================================================================
         # ITERATIVELY REMOVE VALUES FROM SUDOKU AND CHECK IF IT IS STILL SOLVABLE
         # =============================================================================
@@ -619,36 +630,46 @@ class sudoku(object):
             if static_arr.percent()!=100:
                 self.arr[loc],self.arr[loc[::-1]]=v1,v2
         
-        hard_sudoku=self.arr
-        print(np.sum(hard_sudoku!=0))
-        print(hard_sudoku)
+        self.hard_puzzle=np.copy(self.arr)
         
+        #REMOVE A FEW MORE TILES TO CHALLENGE THE SUDOKU EXPERTES
+        locations=np.where(self.arr!=0) #remaining nonzero values
+        locations=[i for i in zip(locations[0],locations[1])] #(x,y) format
         
-        if difficulty=='expert':
-            #Remove a few more tiles to challenge the sudoku experts
-            locations=np.where(self.arr!=0) #remaining nonzero values
-            locations=[i for i in zip(locations[0],locations[1])] #(x,y) format
+        np.random.shuffle(locations)
+        
+        #Iteratively remove any locations that can be removed
+        for loc in locations:
+            v1=self.arr[loc[::-1]]
             
-            np.random.shuffle(locations)
-            
-            #Iteratively remove any locations that can be removed
-            for loc in locations:
-                v1=self.arr[loc[::-1]]
-                
-                self.arr[loc[::-1]]=0
-                static_arr=sudoku(self.arr)
-                static_arr.pair_by_pair()
-                            
-                if static_arr.percent()!=100:
-                    self.arr[loc[::-1]]=v1
+            self.arr[loc[::-1]]=0
+            static_arr=sudoku(self.arr)
+            static_arr.pair_by_pair()
+                        
+            if static_arr.percent()!=100:
+                self.arr[loc[::-1]]=v1
                     
-        expert_sudoku=self.arr
+        self.expert_puzzle=np.copy(self.arr)
         
-        print(np.sum(expert_sudoku!=0))
+        
+        #LETS ADD 8 RANDOM INPUTS TO THE HARD PUZZLE TO HELP OUT THE MEDIUM LEVEL SUDOKU PLAYERS
+        #LEVEL SUDOKU PLAYERS AND 15 RANDOM INPUTS TO HELP THE EASY LEVEL SUDOKU PLAYERS
+        locations=np.where(self.hard_puzzle==0)
+        locations=[i for i in zip(locations[0],locations[1])] #(x,y) format
+        np.random.shuffle(locations)
+        puzzle=np.copy(self.hard_puzzle)
+        for idx in range(10):
+            x,y=locations[idx]
+            puzzle[y,x]=self.solution[y,x]
+            
+            if idx==7:
+                self.medium_puzzle=np.copy(puzzle)
+        
+        self.easy_puzzle=np.copy(puzzle)
             
         
         
-
+            
 
     def possible_values_at(self,x,y):
         '''
@@ -726,6 +747,13 @@ if __name__=='__main__':
     #load array as allinteger values
     arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
     
+    
+    def time_fcn(f,args):
+        t0=time.time()
+        f(*args)
+        t1=time.time()
+        print(str(round(1000*(t1-t2),1)),'ms')
+    
     '''
     #create sudoku object using array
     s=sudoku(arr)
@@ -761,3 +789,23 @@ if __name__=='__main__':
     t1=time.time()
     print(1000*(t1-t0))
     s.show()
+    
+    print(np.sum(s.easy_puzzle!=0))
+    print(s.easy_puzzle)
+    
+    print(np.sum(s.medium_puzzle!=0))
+    print(s.medium_puzzle)
+    
+    print(np.sum(s.hard_puzzle!=0))
+    print(s.hard_puzzle)
+    
+    print(np.sum(s.expert_puzzle!=0))
+    print(s.expert_puzzle)
+    
+    t=sudoku(s.expert_puzzle)
+    
+    t0=time.time()
+    t.solve_intelligent(t.arr)
+    t1=time.time()
+    
+    print(str(round(1000*(t1-t0),2)),'ms')
