@@ -51,7 +51,7 @@ replay_icons=[pygame.image.load(file) for file in glob.glob('./graphics/rotation
 # LOAD SOUND EFFECTS AND MUSIC
 # =============================================================================
 sound_effects_playing=True
-pygame.mixer.init(44100, -16,2,2048)
+pygame.mixer.init()
 
 #click sound effect
 play_tile_sound_effect=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
