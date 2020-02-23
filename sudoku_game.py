@@ -489,7 +489,7 @@ class game_board(object):
 # GENERATE INITIAL VALUES BASED ON SELECTED DIFFICULTY
 # =============================================================================
 def populate_board(difficulty):
-    board.demo=True
+    board.demo=False
     if board.demo:
         puzzle='./puzzles/extreme/ArtoInkala_extreme.txt'
     else:
