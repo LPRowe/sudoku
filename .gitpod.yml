@@ -7,4 +7,4 @@ ports:
     onOpen: open-preview
 tasks:
   - init: pip3 install -r requirements.txt
-    command: sudoku_game.py
+    command: python3 sudoku_game.py
