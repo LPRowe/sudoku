@@ -6,5 +6,4 @@ ports:
     onOpen: open-preview
 tasks:
   - init: pip3 install numpy glob3 pygame 
-    command: export SDL_AUDIODRIVER='dsp'
-    command: python3 sudoku_game.py
+    command: python3 sudoku_game_audio_off.py

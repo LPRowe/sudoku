@@ -54,24 +54,24 @@ replay_icons=[pygame.image.load(file) for file in glob.glob('./graphics/rotation
 # LOAD SOUND EFFECTS AND MUSIC
 # =============================================================================
 sound_effects_playing=True
-pygame.mixer.init()
+#pygame.mixer.init()
 
 #click sound effect
-play_tile_sound_effect=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
+#play_tile_sound_effect=pygame.mixer.Sound('./sound-effects/clicks/click-3.wav')
 
 #new game sound effect
-new_game_sound_effect=pygame.mixer.Sound('./sound-effects/new-game/gong.wav')
+#new_game_sound_effect=pygame.mixer.Sound('./sound-effects/new-game/gong.wav')
 
 #mistake sound effect
-mistake_sound_effect=pygame.mixer.Sound('./sound-effects/oops/light-beat-wrong-bertof.wav')
+#mistake_sound_effect=pygame.mixer.Sound('./sound-effects/oops/light-beat-wrong-bertof.wav')
 
 
 #Background Music
 music_playing=True
 music_cycle=0
 music_files=['./sound-effects/background/music.mp3','./sound-effects/background/chill-retro-background-magntron.mp3','./sound-effects/background/melancholic-background-goodbyte.mp3','./sound-effects/background/up-beat-electric-background-cebuana.mp3']
-music=pygame.mixer.music.load('./sound-effects/background/music.mp3')
-pygame.mixer.music.play(-1)
+#music=pygame.mixer.music.load('./sound-effects/background/music.mp3')
+#pygame.mixer.music.play(-1)
 
 # =============================================================================
 # SCALE SURFACES ACCORDING TO WINDOW SIZE
@@ -518,7 +518,8 @@ def solve_sudoku(arr):
         board.warning_message='The resulting sudoku would not be solvable by human methods.'
         board.warning_start=elapsed_time
         if sound_effects_playing:
-            mistake_sound_effect.play()
+            #mistake_sound_effect.play()
+            pass
         return None
 
 
@@ -647,7 +648,8 @@ def take_action(action):
     # =========================================================================
     if action in ['Easy','Medium','Hard','Expert','Extreme']:
         if sound_effects_playing:
-            new_game_sound_effect.play()
+            #new_game_sound_effect.play()
+            pass
         
         #set game difficulty
         difficulty=action
@@ -672,10 +674,10 @@ def take_action(action):
         
     if action=='music_icon':
         if music_playing:
-            pygame.mixer.music.stop()
+            #pygame.mixer.music.stop()
             music_playing=False
         else:
-            pygame.mixer.music.play(-1)
+            #pygame.mixer.music.play(-1)
             music_playing=True
     
     if action=='sound_effects_icon':
@@ -686,8 +688,8 @@ def take_action(action):
             
     if action=='cycle_icon' and music_playing:
         music_cycle+=1
-        pygame.mixer.music.load(music_files[music_cycle%len(music_files)])
-        pygame.mixer.music.play(-1)
+        #pygame.mixer.music.load(music_files[music_cycle%len(music_files)])
+        #pygame.mixer.music.play(-1)
             
     # =========================================================================
     # IN GAME ACTIONS (except music and sound effects which are listed above)
@@ -714,7 +716,8 @@ def take_action(action):
                 board.is_boxed=False
                 puzzle_finished_check()
                 if sound_effects_playing:
-                    play_tile_sound_effect.play()
+                    #play_tile_sound_effect.play()
+                    pass
                 break
         return None
     
@@ -792,7 +795,8 @@ def take_action(action):
             board.pencil_marks[board.boxed]=[]
             puzzle_finished_check()
             if sound_effects_playing:
-                play_tile_sound_effect.play()
+                #play_tile_sound_effect.play()
+                pass
         elif type(board.boxed)==tuple and board.solution[board.boxed[::-1]]!=int(action):
             #an input was inserted, but it does not agree with the solution
             violation=True
@@ -811,7 +815,8 @@ def take_action(action):
                 board.warning_message='Not a valid entry.'
                 board.warning_start=elapsed_time
                 if sound_effects_playing:
-                    mistake_sound_effect.play()
+                    #mistake_sound_effect.play()
+                    pass
                 return None
 
             #if the value is not in violation of box, row or column rules
@@ -827,7 +832,8 @@ def take_action(action):
                 board.warning_start=elapsed_time
                 oops_count+=1
                 if sound_effects_playing:
-                    mistake_sound_effect.play()
+                    #mistake_sound_effect.play()
+                    pass
                 return None
         
         
