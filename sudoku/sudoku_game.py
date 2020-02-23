@@ -277,6 +277,9 @@ class game_board(object):
         self.active_replay=False
         self.active_replay_tile_count=0
         
+        #Always load sudoku_inkala when in demo mode
+        self.demo=False
+        
         # =============================================================================
         # locations of each icon and active area
         # =============================================================================
@@ -321,6 +324,7 @@ class game_board(object):
         #cycle-icon
         self.cycle_x=int(self.music_x+music_icon.get_size()[0])
         self.cycle_y=int(self.music_y+music_icon.get_size()[1]-cycle_icon.get_size()[1])
+        
         
 
         
@@ -485,8 +489,12 @@ class game_board(object):
 # GENERATE INITIAL VALUES BASED ON SELECTED DIFFICULTY
 # =============================================================================
 def populate_board(difficulty):
-    #pick a random puzzle from the collection of puzzles for given difficulty
-    puzzle=np.random.choice([i for i in glob.glob('./puzzles/'+difficulty.lower()+'/*')])
+    board.demo=True
+    if board.demo:
+        puzzle='./puzzles/extreme/ArtoInkala_extreme.txt'
+    else:
+        #pick a random puzzle from the collection of puzzles for given difficulty
+        puzzle=np.random.choice([i for i in glob.glob('./puzzles/'+difficulty.lower()+'/*')])
     
     #return the puzzle after converting it to a numpy array
     return np.ndarray.astype(np.genfromtxt(puzzle,delimiter=' '),'int')
