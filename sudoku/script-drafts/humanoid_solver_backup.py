@@ -17,8 +17,6 @@ one at a time
 import numpy as np
 from itertools import product
 
-
-
 class sudoku(object):
     def __init__(self, arr=np.full((9,9),0)):
         self.arr=np.array(arr)
@@ -749,15 +747,12 @@ if __name__=='__main__':
     import time
     import glob
     
-    test_inkala=True
+    test_inkala=False
     if test_inkala:
         #Use algorithm to solve one of inkalas challenging problems
         arr=np.ndarray.astype(np.genfromtxt('./puzzles/sudoku_inkala.txt',delimiter=' '),'int')
         s=sudoku(arr)
-        t0=time.time()
         s.solve_intelligent(s.arr)
-        t1=time.time()
-        print(str(round(t1-t0,2)),'seconds')
         s.show()
     
     test_extreme=False
@@ -788,7 +783,7 @@ if __name__=='__main__':
                 f.write('\n')
         f.close()
 
-    create_puzzles=False
+    create_puzzles=True
     if create_puzzles:
         for i in range(10):
             #track how many puzzles exist already
