@@ -6,14 +6,13 @@ Created on Sun Feb 16 00:15:57 2020
 """
 
 import os
-
-os.environ['SDL_AUDIODRIVER'] = 'dsp'
-
 import pygame
 import numpy as np
 from itertools import product
 import humanoid_solver as hs
 import glob
+
+#os.environ['SDL_AUDIODRIVER'] = 'dsp'
 
 pygame.init()
 
