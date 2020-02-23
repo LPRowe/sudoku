@@ -6,4 +6,4 @@ Try the soundless version for yourself by clicking below!
 
 Then expand the game into its own window:
 
-<img src='./screen-shots/expand_game.png'>
+<img src='./screen-shots/expand_game.png' height='300' width='300'>
