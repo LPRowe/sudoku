@@ -1,4 +1,1 @@
-pygame
-numpy
-glob
-itertools
+pygame numpy glob itertools
